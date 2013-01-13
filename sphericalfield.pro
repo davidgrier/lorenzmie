@@ -1,49 +1,47 @@
 ;+
 ; NAME:
-;       sphericalfield
+;    sphericalfield
 ;
 ; PURPOSE:
-;       Calculates the complex electric field defined by an array of scattering
-;       coefficients.
+;    Calculates the complex electric field defined by an array of scattering
+;    coefficients.
 ;
 ; CATEGORY:
-;       Holography, light scattering, microscopy
+;    Holography, light scattering, microscopy
 ;
 ; CALLING SEQUENCE:
-;       field = sphericalfield(x, y, z, a, lambda, $
-;                           mpp = mpp)
+;    field = sphericalfield(x, y, z, ab, lambda)
 ;
 ; INPUTS:
-;       x: [npts] array of pixel coordinates [pixels]
-;       y: [npts] array of pixel coordinates [pixels]
-;       z: If field is required in a single plane, then
-;          z is the plane's distance from the sphere's center
-;          [pixels].
-;          Otherwise, z is an [npts] array of coordinates.
+;    x: [npts] array of pixel coordinates [pixels]
+;    y: [npts] array of pixel coordinates [pixels]
+;    z: If field is required in a single plane, then z is the plane's 
+;       distance from the sphere's center [pixels].
+;       Otherwise, z is an [npts] array of coordinates.
 ;
-;       NOTE: Ideally, x, y and z should be double precision.
-;             This is left to the calling program for efficiency.
+;    NOTE: Ideally, x, y and z should be double precision.
+;          This is left to the calling program for efficiency.
 ;
-;       a: [2,nc] array of a and b scattering coefficients, where
+;    ab: [2,nc] array of Lorenz-Mie scattering coefficients, where
 ;          nc is the number of terms required for convergence.
 ;
-;       lambda: wavelength of light in medium [pixels]
+;    lambda: wavelength of light in medium [pixels]
 ;
 ; KEYWORD FLAGS:
-;       cartesian: If set, return field components in Cartesian
-;           coordinates.  Default: Spherical polar coordinates
+;    cartesian: If set, return field components in Cartesian
+;        coordinates.  Default: Spherical polar coordinates
 ;
 ; OUTPUTS:
-;       field: [3,npts] complex values of field at the positions r.
-;              [0,*]: r component
-;              [1,*]: theta component
-;              [2,*]: phi component
+;    field: [3,npts] complex values of field at the positions r.
+;           [0,*]: r component
+;           [1,*]: theta component
+;           [2,*]: phi component
 ;
-;              If CARTESIAN is set:
-;              [0,*]: x component (incident polarization)
-;              [1,*]: y component (transverse component)
-;              [2,*]: z component (axial component, relative to
-;              incident beam).
+;           If CARTESIAN is set:
+;           [0,*]: x component (incident polarization)
+;           [1,*]: y component (transverse component)
+;           [2,*]: z component (axial component, relative to
+;                  incident beam).
 ;
 ; REFERENCE:
 ;   1. Adapted from Chapter 4 in
@@ -56,39 +54,40 @@
 ;
 ; MODIFICATION HISTORY:
 ; Written by David G. Grier, New York University, 5/2007
-; 6/9/2007: DGG finally read Section 4.8 in Bohren and Huffman about
+; 06/09/2007 DGG finally read Section 4.8 in Bohren and Huffman about
 ;    numerical stability of the recursions used to compute the scattering
 ;    coefficients.  Feh.  Result is a total rewrite.
-; 6/20/2007: DGG Calculate \tau_n(\cos\theta) and \pi_n(\cos\theta)
+; 06/20/2007 DGG Calculate \tau_n(\cos\theta) and \pi_n(\cos\theta)
 ;    according to recurrence relations in 
 ;    W. J. Wiscombe, Appl. Opt. 19, 1505-1509 (1980).
 ;    This is supposed to improve numerical accuracy.
-; 2/8/2008: DGG. Replaced single [3,npts] array of input coordinates
+; 02/08/2008 DGG. Replaced single [3,npts] array of input coordinates
 ;    with two [npts] arrays for x and y, and a separate input for z.
 ;    Eliminated double() call for coordinates.  Z may have 1 element or
 ;    npts elements. Small documentation fixes.
-; 4/3/2008: Bo Sun (Sephiroth), NYU: Calculate Lorenz-Mie a and b
+; 04/03/2008 Bo Sun (Sephiroth), NYU: Calculate Lorenz-Mie a and b
 ;    coefficients using continued fractions rather than recursion.
 ;    Osman Akcakir from Arryx pointed out that the results are
 ;    more accurate in extreme cases.  Method described in
 ;    William J. Lentz, "Generating Bessel functions in Mie scattering
 ;    calculations using continued fractions," Appl. Opt. 15, 668-671
 ;    (1976).
-; 4/4/2008: DGG small code clean-ups and documentation.  Added
+; 04/04/2008 DGG small code clean-ups and documentation.  Added
 ;    RECURSIVE keyword for backward compatibility in computing a and b
 ;    coefficients.
-; 4/11/2008: Sephiroth: Corrected small error in jump code for
+; 04/11/2008 Sephiroth: Corrected small error in jump code for
 ;    repeated fractions in Mie coefficients.
-; 6/25/2008: DGG Don't clobber x coordinate input values.
-; 10/9/2008: DGG adapted from SPHEREFIELD by separating out
+; 6/25/2008 DGG Don't clobber x coordinate input values.
+; 10/9/2008 DGG adapted from SPHEREFIELD by separating out
 ;    calculation of scattering coefficients, a_n and b_n.  This
 ;    is therefore more general, and can be replaced more
 ;    readily with a GPU-accelerated version.
-; 10/13/2008: DGG eliminated RECURSIVE keyword.
-; 06/18/2010: DGG Added COMPILE_OPT.
-; 09/04/2011: DGG Compute -\tau_n rather than \tau_n
+; 10/13/2008 DGG eliminated RECURSIVE keyword.
+; 06/18/2010 DGG Added COMPILE_OPT.
+; 09/04/2011 DGG Compute -\tau_n rather than \tau_n
+; 01/13/2013 DGG Documentation fixes and formatting.
 ;
-; Copyright (c) 2007-2011, Bo Sun and David G. Grier
+; Copyright (c) 2007-2013 Bo Sun and David G. Grier
 ;-
 
 function sphericalfield, x_, y_, z_, ab, lambda, $
