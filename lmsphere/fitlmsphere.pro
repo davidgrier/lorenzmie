@@ -38,7 +38,7 @@
 ;    lambda: vacuum wavelength of illumination [micrometers].
 ;    mpp: Length-scale calibration factor [micrometers/pixel].
 ;
-; KEYWORD PARAMETERS:
+; KEYWORD INPUTS:
 ;    precision: Convergence tolerance of nonlinear least-squares fit.
 ;      Default: 5d-5.
 ;
@@ -70,6 +70,9 @@
 ;         This requires GPULib.
 ;
 ;    quiet: If set, do not show results of intermediate calculations.
+;
+; KEYWORD OUTPUTS:
+;    chisq: Chi-squared value of a (successful) fit.
 ;
 ; OUTPUTS:
 ;    params: Least-squares fits for the values estimated in P.
@@ -144,8 +147,9 @@
 ; 10/12/2012 DGG Major overhaul of parameter handling to incorporate
 ;    DELTA.  LAMBDA and MPP now are required inputs, rather than
 ;    optional keywords.  Renamed to fitlmsphere.
+; 01/14/2013 DGG Added CHISQ keyword.
 ;
-; Copyright (c) 2007-2012, David G. Grier, Fook Chiong Cheong and
+; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
 ;-
 function lmsphere_objf, obj, p
@@ -214,6 +218,7 @@ function fitlmsphere, a, $                    ; image
                       p0, $                   ; starting estimates for parameters
                       lambda, $               ; wavelength of light [micrometers]
                       mpp, $                  ; micrometers per pixel
+                      chisq = chisq, $        ; chi-squared value of fit
                       aplimits = aplimits, $  ; limits on ap [micrometers]
                       nplimits = nplimits, $  ; limits on np
                       fixnp = fixnp, $        ; fix particle refractive index
@@ -350,7 +355,7 @@ if keyword_set(object) then begin
       
    p = mpfitfun('lmsphere_objf', obj, aa, err, p0, $
                 parinfo = parinfo, /fastnorm, $
-                perror = perror, bestnorm = bestnorm, dof = dof, $
+                perror = perror, bestnorm = chisq, dof = dof, $
                 status = status, errmsg = errmsg, quiet = quiet, $
                 ftol = precision)
 endif else begin
@@ -375,7 +380,7 @@ endif else begin
 ; perform fit
    p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
                   parinfo = parinfo, /fastnorm, $
-                  perror = perror, bestnorm = bestnorm, dof = dof, $
+                  perror = perror, bestnorm = chisq, dof = dof, $
                   status = status, errmsg = errmsg, quiet = quiet, $
                   ftol = precision)
 
@@ -394,7 +399,7 @@ endif
 
 ; success
 ; rescale fit uncertainties into error estimates
-dp = perror * sqrt(bestnorm/dof)
+dp = perror * sqrt(chisq/dof)
 
-return, [transpose(p),transpose(dp)]
+return, [transpose(p), transpose(dp)]
 end
