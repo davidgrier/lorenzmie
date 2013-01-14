@@ -110,11 +110,11 @@
 ;-    
 ;;;;
 ;
-; DggdhmLMSphere::ComputeCPU
+; DGGdhmLMSphere::ComputeCPU
 ;
 ; Compute hologram on CPU
 ;
-pro DggdhmLMSphere::ComputeCPU
+pro DGGdhmLMSphere::ComputeCPU
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -125,11 +125,11 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::Compute
+; DGGdhmLMSphere::Compute
 ;
 ; Compute hologram
 ;
-pro DggdhmLMSphere::Compute
+pro DGGdhmLMSphere::Compute
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -347,26 +347,26 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::SetProperty
+; DGGdhmLMSphere::SetProperty
 ;
 ; Set properties associated with the hologram
 ;
-pro DggdhmLMSphere::SetProperty, xp = xp, $
-                                  yp = yp, $
-                                  zp = zp, $
-                                  rp = rp, $
-                                  ap = ap, $
-                                  np = np, $
-                                  kp = kp, $
-                                  nm = nm, $
-                                  km = km, $
-                                  alpha = alpha, $
-                                  delta = delta, $
-                                  lambda = lambda, $
-                                  mpp = mpp, $
-                                  deinterlace = deinterlace, $
-                                  type = type, $
-                                  dim = dim
+pro DGGdhmLMSphere::SetProperty, xp = xp, $
+                                 yp = yp, $
+                                 zp = zp, $
+                                 rp = rp, $
+                                 ap = ap, $
+                                 np = np, $
+                                 kp = kp, $
+                                 nm = nm, $
+                                 km = km, $
+                                 alpha = alpha, $
+                                 delta = delta, $
+                                 lambda = lambda, $
+                                 mpp = mpp, $
+                                 deinterlace = deinterlace, $
+                                 type = type, $
+                                 dim = dim
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -456,29 +456,29 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::GetProperty
+; DGGdhmLMSphere::GetProperty
 ;
 ; Retrieve the value of properties associated with the hologram
 ;
-pro DggdhmLMSphere::GetProperty, hologram = hologram, $
-                                  field = field, $
-                                  dim = dim, $
-                                  ab = ab, $
-                                  xp = xp, $
-                                  yp = yp, $
-                                  zp = zp, $
-                                  rp = rp, $
-                                  ap = ap, $
-                                  np = np, $
-                                  kp = kp, $
-                                  nm = nm, $
-                                  km = km, $
-                                  alpha = alpha, $
-                                  delta = delta, $
-                                  lambda = lambda, $
-                                  mpp = mpp, $
-                                  deinterlace = deinterlace, $
-                                  type = type
+pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
+                                 field = field, $
+                                 dim = dim, $
+                                 ab = ab, $
+                                 xp = xp, $
+                                 yp = yp, $
+                                 zp = zp, $
+                                 rp = rp, $
+                                 ap = ap, $
+                                 np = np, $
+                                 kp = kp, $
+                                 nm = nm, $
+                                 km = km, $
+                                 alpha = alpha, $
+                                 delta = delta, $
+                                 lambda = lambda, $
+                                 mpp = mpp, $
+                                 deinterlace = deinterlace, $
+                                 type = type
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -516,11 +516,11 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::GPUInit
+; DGGdhmLMSphere::GPUInit
 ;
 ; Initialize GPU and allocate GPU memory
 ;
-function DggdhmLMSphere::GPUInit
+function DGGdhmLMSphere::GPUInit
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -578,24 +578,24 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::Init
+; DGGdhmLMSphere::Init
 ;
 ; Initialize computational pipeline
 ;
-function DggdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
-                                lambda = lambda, $ ; wavelength [um]        (R)
-                                mpp    = mpp,    $ ; mag [um/pixel]         (R)
-                                xp = xp,         $ ; sphere position [pixel]
-                                yp = yp,         $
-                                zp = zp,         $
-                                rp = rp,         $ ; 3D position [pixel]
-                                ap = ap,         $ ; sphere radius [um]
-                                np = np,         $ ; sphere refractive index
-                                nm = nm,         $ ; medium refractive index
-                                alpha = alpha,   $ ; relative illumination amplitude
-                                delta = delta,   $ ; illumination wavefront distortion
-                                deinterlace = deinterlace, $
-                                single = single
+function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
+                               lambda = lambda, $ ; wavelength [um]        (R)
+                               mpp    = mpp,    $ ; mag [um/pixel]         (R)
+                               xp = xp,         $ ; sphere position [pixel]
+                               yp = yp,         $
+                               zp = zp,         $
+                               rp = rp,         $  ; 3D position [pixel]
+                               ap = ap,         $  ; sphere radius [um]
+                               np = np,         $  ; sphere refractive index
+                               nm = nm,         $  ; medium refractive index
+                               alpha = alpha,   $  ; relative illumination amplitude
+                               delta = delta,   $  ; illumination wavefront distortion
+                               deinterlace = deinterlace, $
+                               single = single
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -702,11 +702,11 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere::Cleanup
+; DGGdhmLMSphere::Cleanup
 ;
 ; Free resources used by computational pipeline
 ;
-pro DggdhmLMSphere::Cleanup
+pro DGGdhmLMSphere::Cleanup
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -731,15 +731,15 @@ end
 
 ;;;;
 ;
-; DggdhmLMSphere__define
+; DGGdhmLMSphere__define
 ;
-; Define the object structure for a DggdhmLMSphere object
+; Define the object structure for a DGGdhmLMSphere object
 ;
-pro DggdhmLMSphere__define
+pro DGGdhmLMSphere__define
 
 COMPILE_OPT IDL2
 
-struct = {DggdhmLMSphere,           $
+struct = {DGGdhmLMSphere,            $
           INHERITS     IDL_OBJECT,   $
           hologram:    ptr_new(),    $ ; computed hologram
           dim:         [0L, 0L],     $ ; dimensions of hologram

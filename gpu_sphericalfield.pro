@@ -1,50 +1,49 @@
 ;+
 ; NAME:
-;       gpu_sphericalfield
+;    gpu_sphericalfield
 ;
 ; PURPOSE:
-;       Calculates the electric field in a light scattering
-;       pattern defined by a set of Lorenz-Mie scattering
-;       coefficients.  Uses gpulib for hardware acceleration.
+;    Calculates the electric field in a light scattering
+;    pattern defined by a set of Lorenz-Mie scattering
+;    coefficients.  Uses gpulib for hardware acceleration.
 ;
 ; CATEGORY:
-;       Light scattering, holographic microscopy
+;    Light scattering, holographic microscopy
 ;
 ; CALLING SEQUENCE:
-;       field = gpu_sphericalfield(x, y, z, a, lambda, $
-;                           mpp = mpp, k = k)
+;    field = gpu_sphericalfield(x, y, z, ab, lambda, k = k)
 ;
 ; INPUTS:
-;       x: [npts] array of pixel coordinates [pixels]
-;       y: [npts] array of pixel coordinates [pixels]
-;       z: If field is required in a single plane, then
-;          z is the plane's distance from the sphere's center
-;          [pixels].
-;          Otherwise, z is an [npts] array of coordinates.
+;    x: [npts] array of pixel coordinates [pixels]
+;    y: [npts] array of pixel coordinates [pixels]
+;    z: If field is required in a single plane, then
+;       z is the plane's distance from the sphere's center
+;       [pixels].
+;       Otherwise, z is an [npts] array of coordinates.
 ;
-;       a: [2,nc] array of a and b scattering coefficients, where
-;          nc is the number of terms required for convergence.
+;    ab: [2,nc] array of a and b scattering coefficients, where
+;        nc is the number of terms required for convergence.
 ;
-;       lambda: wavelength of light in medium [pixels]
+;    lambda: wavelength of light in medium [pixels]
 ;
 ; KEYWORD FLAGS:
-;       cartesian: If set, return field components in Cartesian
-;           coordinates.  Default: Spherical polar coordinates
+;    cartesian: If set, return field components in Cartesian
+;               coordinates.  Default: Spherical polar coordinates
 ;
 ; OUTPUT KEYWORDS:
-;       k: scaled wavenumber of light in medium [inverse pixels]
+;    k: scaled wavenumber of light in medium [inverse pixels]
 ;
 ; OUTPUTS:
-;       field: [3,npts] complex values of field at the positions r.
-;              [0,*]: r component
-;              [1,*]: theta component
-;              [2,*]: phi component
+;    field: [3,npts] complex values of field at the positions r.
+;           [0,*]: r component
+;           [1,*]: theta component
+;           [2,*]: phi component
 ;
-;              If CARTESIAN is set:
-;              [0,*]: x component (incident polarization)
-;              [1,*]: y component (transverse component)
-;              [2,*]: z component (axial component, relative to
-;              incident beam).
+;           If CARTESIAN is set:
+;           [0,*]: x component (incident polarization)
+;           [1,*]: y component (transverse component)
+;           [2,*]: z component (axial component, relative to
+;           incident beam).
 ;
 ; REFERENCES:
 ; 1. Adapted from Chapter 4 in
@@ -130,8 +129,9 @@
 ; 06/28/2011 DGG identified bug: returns NAN when x = y = 0.  Problem
 ;     line identified by FIXME below.  Current workaround: make sure
 ;     not to call with x = y = 0.  Even a small offset will work.
+; 01/14/2013 DGG documentation fixes.
 ;
-; Copyright (c) 2007-2011 Bo Sun, Jesse Amato-Grill and David G. Grier
+; Copyright (c) 2007-2013 Bo Sun, Jesse Amato-Grill and David G. Grier
 ;-
 
 function gpu_sphericalfield, x_, y_, z_, ab_, lambda, $
@@ -142,7 +142,7 @@ COMPILE_OPT IDL2
 
 type = (keyword_set(double) && gpudoublecapable()) ? 9 : 6 ; dcomplex or complex
 
-ab = fix(ab_, TYPE = type)     ; Lorenz-Mie scattering coefficients
+ab = fix(ab_, TYPE = type)      ; Lorenz-Mie scattering coefficients
 nc = n_elements(ab[0, *]) - 1   ; number of terms required for convergence
 ci = fix(complex(0, 1), TYPE = type)
 
@@ -389,7 +389,7 @@ endelse
 ;gpuFree, [Ne1n1, Ne1n2, Ne1n3]
 ;gpuFree, [Es1, Es2, Es3]
 
-Es = [[Es1_cpu],[Es2_cpu],[Es3_cpu]]
+Es = [[Es1_cpu], [Es2_cpu], [Es3_cpu]]
 
 return, transpose(Es)
 end
