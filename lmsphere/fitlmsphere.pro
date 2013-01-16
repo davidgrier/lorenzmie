@@ -21,7 +21,7 @@
 ;      p[0] : xp : x-coordinate of sphere's center [pixels]
 ;      p[1] : yp : y-coordinate [pixels]
 ;      p[2] : zp : z-coordinate [pixels]
-;      p[3] : ap : sphere's radius [micrometers]
+;      p[3] : ap : sphere's radius [meicrometers]
 ;      p[4] : np : sphere's refractive index
 ;      p[5] : kp : sphere's extinction coefficient: Default: fixed at 0.
 ;      p[6] : nm : medium's refractive index
