@@ -172,7 +172,7 @@ debug = keyword_set(debug)
 rp = ctfeature(a, range = range, noise = noise, threshold = threshold, $
                pickn = pickn, count = count, deinterlace = deinterlace)
 
-if count ge 1 and 
+if count ge 1 then $
    rad = ct_range(a, rp, range = range, noise = noise, deinterlace = deinterlace)
 
 if doreport then $
