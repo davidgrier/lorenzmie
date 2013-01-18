@@ -174,9 +174,6 @@ debug = keyword_set(debug)
 rp = ctfeature(a, noise = noise, threshold = threshold, pickn = pickn, $
                count = count, deinterlace = deinterlace)
 
-if isa(pickn, /scalar, /number) && count lt pickn then $
-   message, 'PICKN: not enough features found -- proceeding', /inf
-
 if doreport then $
    message, string(count, (count ne 1) ? 's' : '', $
                    format = '(I0," feature",A," found")'), /inf
