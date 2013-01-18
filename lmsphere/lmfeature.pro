@@ -124,10 +124,9 @@ function lmfeature, a, lambda, mpp, $
 
 COMPILE_OPT IDL2
 
-;;; Process command line parameters
-
 umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
 
+;;; Process command line parameters
 if n_params() ne 3 then begin
    message, umsg, /inf
    return, -1
