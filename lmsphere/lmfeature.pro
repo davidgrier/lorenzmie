@@ -31,9 +31,6 @@
 ;        Default: Process all features above threshold
 ;
 ;    Parameters for 3D feature location and characterization:
-;    rad: Radius over which to fit a given feature [pixels]
-;        Default: estimated from image
-;
 ;    ap: ballpark radius of sphere [micrometers]
 ;        Default: estimated from image
 ;
@@ -102,6 +99,7 @@
 ; 11/11/2012 DGG Treat nm and np as complex values.  Eliminate km and kp.
 ; 11/30/2012 DGG Updated for revisions to CTFEATURE and related
 ;   routines.  Implemented FIXALPHA.
+; 01/16/2013 DGG Estimate rad using CT_RANGE.  Remove RAD keyword.
 ;
 ; Copyright (c) 2008-2012 David G. Grier and Fook Chiong Cheong
 ;-
@@ -110,7 +108,6 @@ function lmfeature, a, lambda, mpp, $
                     noise = noise, $
                     threshold = threshold, $
                     pickn = pickn, $
-                    rad = rad, $
                     ap = ap0, $
                     np = np0, $
                     nm = nm0, $
@@ -138,6 +135,8 @@ if ~isa(a, /number, /array) or sz[0] ne 2 then begin
    message, 'A must be a two-dimensional normalized hologram', /inf
    return, -1
 endif
+width = sz[1]
+height = sz[2]
 
 if ~isa(lambda, /number, /scalar) then begin
    message, umsg, /inf
@@ -159,7 +158,6 @@ if ~isa(nm0, /number, /scalar) then $
 
 k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
 
-dorad = ~isa(rad, /number, /scalar) ; estimate size of ROI for each feature
 doap = ~isa(ap0, /number, /scalar)  ; estimate radius of each feature
 
 fixalpha = keyword_set(fixalpha)
@@ -171,8 +169,11 @@ dographics = arg_present(graphics) || keyword_set(graphics)
 debug = keyword_set(debug)
 
 ;;; Find candidate features
-rp = ctfeature(a, noise = noise, threshold = threshold, pickn = pickn, $
-               count = count, deinterlace = deinterlace)
+rp = ctfeature(a, range = range, noise = noise, threshold = threshold, $
+               pickn = pickn, count = count, deinterlace = deinterlace)
+
+if count ge 1 and 
+   rad = ct_range(a, rp, range = range, noise = noise, deinterlace = deinterlace)
 
 if doreport then $
    message, string(count, (count ne 1) ? 's' : '', $
@@ -195,15 +196,11 @@ for ndx = 0L, count - 1 do begin
    rp0 = rp[0:1, ndx]
 
    ;; Crop image to region of interest
-   if dorad then begin          ; estimate radius
-      hm = ct_hitormiss(a, rp0, noise = noise, $
-                        deinterlace = deinterlace, /coordinates)
-      rad = round(100.*sqrt(total(hm[2,*])/n_elements(hm[2,*])))
-   endif
-   x0 = round(rp0[0] - rad) > 0L
-   x1 = round(rp0[0] + rad) < sz[1] - 1L
-   y0 = round(rp0[1] - rad) > 0L
-   y1 = round(rp0[1] + rad) < sz[2] - 1L
+   thisrad = rad[n]
+   x0 = round(rp0[0] - thisrad) > 0L
+   x1 = round(rp0[0] + thisrad) < width - 1L
+   y0 = round(rp0[1] - thisrad) > 0L
+   y1 = round(rp0[1] + thisrad) < height - 1L
    if dographics then begin
       poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
       roi = plot(poly, /over, linestyle = '--', color = 'light green')
@@ -222,7 +219,7 @@ for ndx = 0L, count - 1 do begin
    m = max(abs(res), loc)
    zmax = z[loc]                ; axial position of intensity maximum [pixels]
 
-   b = aziavg(aa, center = rc, rad = rad, $
+   b = aziavg(aa, center = rc, rad = thisrad, $
               deinterlace = deinterlace) ; radial profile around center
    
    ;; Model observed interference pattern as Poisson's spot
@@ -249,7 +246,7 @@ for ndx = 0L, count - 1 do begin
    if doreport then begin
       message, 'feature: '+strtrim(ndx,2), /inf
       message, 'starting estimates:', /inf
-      message, string(rp0, zp, rad, $
+      message, string(rp0, zp, thisrad, $
                       format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
       message, string(ap, real_part(np0), $
                       format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
@@ -269,7 +266,7 @@ for ndx = 0L, count - 1 do begin
    ;; Improved estimates
    if doreport then begin
       message, 'improved estimates:', /inf
-      message, string(rp0, p1[0, 0], rad, $
+      message, string(rp0, p1[0, 0], thisrad, $
                       format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
       message, string(p1[0, 1:2], $
                       format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
