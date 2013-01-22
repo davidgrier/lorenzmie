@@ -71,7 +71,7 @@
 ;      
 ; PROCEDURE:
 ;   CT_FEATURE identifies candidate features using CIRCLETRANSFORM.
-;   CT_HITORMISS estimates range around each feature.
+;   CT_RANGE estimates range around each feature.
 ;   RS1D estimates zp.
 ;   Poisson-spot model estimates ap and improves zp.
 ;   FITSPHERELM1D refines estimate for zp, ap and np.
