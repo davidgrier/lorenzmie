@@ -45,6 +45,8 @@
 ;      Default: [1.01 nm, 3.]
 ;
 ; KEYWORD OUTPUTS:
+;    chisq: chi-squared value of fit
+;
 ;    fit: best fit to data
 ;
 ; KEYWORD FLAGS:
@@ -95,6 +97,7 @@
 ;    Renamed to fitlmsphere1d.
 ; 11/10/2012 DGG Added FIT keyword to return fitted function.
 ;    Constrain upper limit of alpha.  Update formatting documentation.
+; 01/22/2013 DGG Optionally return chi-squared value of fit.
 ;
 ; Copyright (c) 2009-2012 David G. Grier
 ;-
@@ -138,10 +141,11 @@ dhm = total(real_part(field*conj(field)), 1)
 return, dhm
 end
 
-function fitlmsphere1d, a, $                     ; image
-                        p0, $                    ; starting estimates for parameters
-                        lambda, $                ; wavelength of light [micrometers]
-                        mpp, $                   ; micrometers per pixel
+function fitlmsphere1d, a, $                      ; image
+                        p0, $                     ; starting estimates for parameters
+                        lambda, $                 ; wavelength of light [micrometers]
+                        mpp, $                    ; micrometers per pixel
+                        chisq = chisq, $          ; chi-squared value of fit
                         aplimits = aplimits, $
                         nplimits = nplimits, $
                         fixap = fixap, $          ; fix particle radius
@@ -257,7 +261,7 @@ perror = fltarr(nparams)
 ; perform fit
 p = mpfitfun('lmsphere1d_f', rho, a, err, p0, functargs = argv, $
              parinfo = parinfo, /fastnorm, $
-             perror = perror, bestnorm = bestnorm, dof = dof, $
+             perror = perror, bestnorm = chisq, dof = dof, $
              yfit = fit, $
              quiet = quiet)
 
@@ -266,7 +270,7 @@ if n_elements(p) eq 1 then return, -1
 
 ; success
 ; rescale fit uncertainties into error estimates
-dp = perror * sqrt(bestnorm/dof)
+dp = perror * sqrt(chisq/dof)
 
 return, [transpose(p),transpose(dp)]
 end

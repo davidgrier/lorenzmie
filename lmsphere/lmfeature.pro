@@ -186,10 +186,8 @@ if dographics then begin
              linestyle = '', symbol = 'o', color = 'red')
 endif
 
-if count lt 1 then $
-   return, []
-   
-rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
+if count ge 1 then $
+   rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
 p = []
