@@ -172,9 +172,6 @@ debug = keyword_set(debug)
 rp = ctfeature(a, noise = noise, threshold = threshold, $
                pickn = pickn, count = count, deinterlace = deinterlace)
 
-if count ge 1 then $
-   rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
-
 if doreport then $
    message, string(count, (count ne 1) ? 's' : '', $
                    format = '(I0," feature",A," found")'), /inf
@@ -188,6 +185,11 @@ if dographics then begin
    pf = plot(rp[0,*], rp[1,*], /over, $
              linestyle = '', symbol = 'o', color = 'red')
 endif
+
+if count lt 1 then $
+   return, []
+   
+rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
 p = []
