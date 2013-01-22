@@ -169,11 +169,11 @@ dographics = arg_present(graphics) || keyword_set(graphics)
 debug = keyword_set(debug)
 
 ;;; Find candidate features
-rp = ctfeature(a, range = range, noise = noise, threshold = threshold, $
+rp = ctfeature(a, noise = noise, threshold = threshold, $
                pickn = pickn, count = count, deinterlace = deinterlace)
 
 if count ge 1 then $
-   rad = ct_range(a, rp, range = range, noise = noise, deinterlace = deinterlace)
+   rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 if doreport then $
    message, string(count, (count ne 1) ? 's' : '', $
@@ -196,7 +196,7 @@ for ndx = 0L, count - 1 do begin
    rp0 = rp[0:1, ndx]
 
    ;; Crop image to region of interest
-   thisrad = rad[n]
+   thisrad = rad[ndx]
    x0 = round(rp0[0] - thisrad) > 0L
    x1 = round(rp0[0] + thisrad) < width - 1L
    y0 = round(rp0[1] - thisrad) > 0L
