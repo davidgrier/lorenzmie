@@ -75,7 +75,12 @@
 ;   RS1D estimates zp.
 ;   Poisson-spot model estimates ap and improves zp.
 ;   FITSPHERELM1D refines estimate for zp, ap and np.
-;   FITSPHERELM yields final estimates for parameters
+;   FITSPHERELM yields final estimates for parameters.
+;
+; NOTES:
+; 01/23/2013 DGG Tried scanning initial estimates for zp and ap in
+;   fitlmsphere1d.  Fits consistently locked on to same solution over
+;   entire range.  Z-scan not necessary, therefore.
 ;
 ; MODIFICATION HISTORY:
 ; 10/07/08: Written by FC Cheong and David G. Grier, New York University.
