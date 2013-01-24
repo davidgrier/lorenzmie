@@ -229,7 +229,7 @@ for ndx = 0L, count - 1 do begin
       c = fix(b ge 1)
       z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; zero crossings [pixels]
       ;; Compare radii to those of Bessel function
-      x0 = [2.4048, 5.5201]                        ; first zeros of J0(x)
+      x0 = [2.4048, 5.5201, 8.6537]                ; zeros of J0(x)
       ap = zmax /(2.*k*mean(z0/x0) - 1.)           ; estimated radius [um]
    endif else $
       ap = ap0
@@ -242,7 +242,7 @@ for ndx = 0L, count - 1 do begin
    alpha = 1.d
    delta = 0.d
 
-   ;; Staring estimates
+   ;; Starting estimates
    if doreport then begin
       message, 'feature: '+strtrim(ndx,2), /inf
       message, 'starting estimates:', /inf
@@ -254,8 +254,9 @@ for ndx = 0L, count - 1 do begin
 
    ;; Improve estimates by fitting to azimuthally averaged image
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
-	 real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
-   p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, /quiet)
+         real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
+   p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = chisq, /quiet)
+
    ;; Some fits fail with alpha = 2.0; have to fixdelta.
    peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
    if peggedalpha then begin
@@ -265,7 +266,7 @@ for ndx = 0L, count - 1 do begin
 
    ;; Improved estimates
    if doreport then begin
-      message, 'improved estimates:', /inf
+      message, 'improved estimates:'+string(chisq), /inf
       message, string(rp0, p1[0, 0], thisrad, $
                       format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
       message, string(p1[0, 1:2], $
@@ -282,6 +283,7 @@ for ndx = 0L, count - 1 do begin
    ;; 2D fit to refine estimates
    p2 = [drc, reform(p1[0, *])] ; initial parameters from 1D fit
    thisp = fitlmsphere(aa, p2, lambda, mpp, $
+                       chisq = chisq, $
                        fixalpha = fixalpha, $
                        fixdelta = fixdelta || peggedalpha, $
                        deinterlace = deinterlace, $
@@ -295,7 +297,7 @@ for ndx = 0L, count - 1 do begin
    thisp[0,0:1] += origin       ; center in original image
    
    if doreport then begin
-      message, 'refined estimates:', /inf
+      message, 'refined estimates:'+string(chisq), /inf
       message, string(thisp[0, 0:2], $
                       format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
       message, string(thisp[0, 3:4], $
