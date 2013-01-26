@@ -149,7 +149,7 @@
 ;    optional keywords.  Renamed to fitlmsphere.
 ; 01/14/2013 DGG Added CHISQ keyword.
 ; 01/26/2013 DGG Compute coordinates relative to lower-left corner of
-;    image rather than center.
+;    image rather than center.  Correctly ignore deinterlace = 0.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -350,7 +350,7 @@ if keyword_set(object) then begin
    endif
 
    aa = double(a)
-   if n_elements(deinterlace) gt 0 then begin
+   if keyword_set(deinterlace) then begin
       w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
       aa = aa[*, w]
    endif
@@ -368,7 +368,7 @@ endif else begin
 
    aa = double(reform(a, npts))
 
-   if n_elements(deinterlace) gt 0 then begin
+   if keyword_set(deinterlace) then begin
       w = where((y mod 2) eq (deinterlace mod 2), npts)
       x = x[w]
       y = y[w]
