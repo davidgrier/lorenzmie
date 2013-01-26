@@ -13,8 +13,8 @@
 ;    holo = lmsphere(rp, ap, np, nm, lambda, mpp, dim)
 ;
 ; INPUTS:
-;    rp  : [x,y,z] 3 dimensional position of sphere relative to center
-;          of image.
+;    rp  : [x,y,z] 3 dimensional position of sphere relative to
+;          lower-left corner of image.
 ;    ap  : radius of sphere [micrometers]
 ;    np  : (complex) refractive index of sphere
 ;    nm  : (complex) refractive index of medium
@@ -78,6 +78,9 @@
 ; 10/15/2012 DGG renamed to lmsphere.  Removed LUT option.
 ;    Reorganized parameters.  Added DELTA.
 ; 01/26/2013 DGG Documentation updates.
+;    Major change: Coordinates computed relative to lower-left corner,
+;    rather than relative to center.  Simplifies interpretation of
+;    coordinates and eliminates off-by-one and off-by-half errors.
 ;
 ; Copyright (c) 2007-2013 David G. Grier
 ;-
@@ -91,10 +94,10 @@ function lmsphere, rp, ap, np, nm, lambda, mpp, dim, $
 COMPILE_OPT IDL2
 
 umsg = 'USAGE: lmsphere, rp, ap, np, nm, lambda, mpp, dim'
-; rp: [xp,yp,zp] position of sphere relative to center of image [pixels]
-;          NOTE: We take z to denote the sphere's
+; rp: [xp,yp,zp] position of sphere relative to lower-left corner of image [pixels]
+;          NOTE: We take zp to denote the sphere's
 ;                height above the imaging plane.  In general,
-;                therefore, z should be input as a positive number.
+;                therefore, zp should be input as a positive number.
 ; ap: radius of sphere [micrometers]
 ; np: (complex) index of particle
 ; nm: (complex) index of medium
@@ -151,8 +154,8 @@ endif
 nx = float(dim[0])
 ny = float(dim[1])
 npts = nx * ny
-x = findgen(nx) - (nx - 1.)/2. - float(rp[0])
-y = findgen(1, ny) - (ny - 1.)/2. - float(rp[1])
+x = findgen(nx) - float(rp[0])
+y = findgen(1, ny) - float(rp[1])
 x = rebin(x, nx, ny)
 y = rebin(y, nx, ny)
 

@@ -148,6 +148,8 @@
 ;    DELTA.  LAMBDA and MPP now are required inputs, rather than
 ;    optional keywords.  Renamed to fitlmsphere.
 ; 01/14/2013 DGG Added CHISQ keyword.
+; 01/26/2013 DGG Compute coordinates relative to lower-left corner of
+;    image rather than center.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -359,8 +361,10 @@ if keyword_set(object) then begin
                 status = status, errmsg = errmsg, quiet = quiet, $
                 ftol = precision)
 endif else begin
-   x = dindgen(npts) mod nx     ; coordinates of pixels
-   y = double(floor(dindgen(npts) / nx))
+   x = dindgen(nx)
+   y = dindgen(1, ny)
+   x = rebin(x, nx, ny)
+   y = rebin(y, nx, ny)
 
    aa = double(reform(a, npts))
 
@@ -370,9 +374,6 @@ endif else begin
       y = y[w]
       aa = aa[w]
    endif
-
-   x -= double(nx - 1.d) / 2.d
-   y -= double(ny - 1.d) / 2.d
 
 ; parameters passed to the fitting function
    argv = {lambda:lambda, mpp:mpp, precision:precision, gpu:gpu}
