@@ -69,8 +69,9 @@
 ;    bug in bn coefficients for multilayer spheres.
 ; 05/31/2011 DGG Fixed corner condition in Nstop code.
 ; 09/04/2011 DGG Added RESOLUTION keyword
+; 01/26/2013 DGG Calculate x with real part of nm
 ;
-; Copyright (c) 2010-2011, F. C. Cheong and D. G. Grier
+; Copyright (c) 2010-2013 F. C. Cheong and D. G. Grier
 ; 
 
 ;;;;;
@@ -119,7 +120,7 @@ if nlayers gt 1 then begin
    np = np[order]
 endif
 
-x = abs(2.d * !dpi * nm * ap / lambda) ; size parameter [array]
+x = 2.d * !dpi * real_part(nm) * ap / lambda ; size parameter [array]
 m = dcomplex(np/nm)                    ; relative refractive index [array]
 
 nmax = Nstop(x, m)              ; number of terms in partial-wave expansion

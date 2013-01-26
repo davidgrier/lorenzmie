@@ -229,6 +229,7 @@ parinfo[2].limited = 1
 parinfo[2].limits = [1.01*p0[4], 3.d] ; FIXME what about low-index particles?
 if n_elements(nplimits) eq 2 then $
    parinfo[2].limits = nplimits
+parinfo[2].fixed = keyword_set(fixnp)
 ; kp: Extinction coefficient of particle
 parinfo[3].limited = 1
 parinfo[3].limits = [0.d, 10.d]
