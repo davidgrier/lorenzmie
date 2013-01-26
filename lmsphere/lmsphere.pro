@@ -33,6 +33,9 @@
 ;    alpha: fraction of incident light scattered by particle.
 ;           Default: 1.
 ;
+;    delta: wavefront distortion [wavelengths]
+;           Default: 0.
+;
 ;    precision: relative precision with which fields are calculated.
 ;
 ; KEYWORD FLAGS:
@@ -73,9 +76,10 @@
 ; 06/23/2012 DGG flipped sign of xp and yp for consistency with
 ;    fitspheredhm and dggdhmspheredhm.
 ; 10/15/2012 DGG renamed to lmsphere.  Removed LUT option.
-;    Reorganized parameters.  Added DELTA
+;    Reorganized parameters.  Added DELTA.
+; 01/26/2013 DGG Documentation updates.
 ;
-; Copyright (c) 2007-2012 David G. Grier
+; Copyright (c) 2007-2013 David G. Grier
 ;-
 
 function lmsphere, rp, ap, np, nm, lambda, mpp, dim, $
