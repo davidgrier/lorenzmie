@@ -11,7 +11,7 @@
 ;      Digital holography, microscopy
 ;
 ; CALLING SEQUENCE:
-;      p = lmsphereprofile(rho,zp,ap,np,nm,alpha)
+;      p = lmsphereprofile(rho,zp,ap,np,nm,alpha,delta,lambda,mpp)
 ;
 ; INPUTS:
 ;      rho: [npts] array of radii [pixels]
@@ -46,8 +46,9 @@
 ; 04/15/2008 DGG Added MPP keyword.  Associated documentation fixes.
 ; 10/12/2012 DGG Revised interference code.  Added support for DELTA.
 ;    Renamed to lmsphereprofile.
+; 01/26/2013 DGG Correct documentation
 ;
-; Copyright (c) 2007-2012 David G. Grier
+; Copyright (c) 2007-2013 David G. Grier
 ;-
 
 function lmsphereprofile, rho, zp, ap, np, nm, alpha, delta, lambda, mpp
