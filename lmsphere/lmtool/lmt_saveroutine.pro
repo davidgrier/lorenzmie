@@ -21,6 +21,9 @@ fn = dialog_pickfile(/write, /overwrite_prompt, $
 
 if strlen(fn) lt 1 then return
 
+widget_control, ev.top, get_uvalue = s
+h = (*s).p.h
+
 openw, lun, fn, /get_lun
 printf, lun, ';;; routine generated automatically by LMTOOL'
 printf, lun, ';;; '+systime()
@@ -33,9 +36,9 @@ printf, lun, ';;; Compute background estimate'
 printf, lun, 'bg = bgestimate(vob) > 1.'
 printf, lun, 'vob.rewind'
 printf, lun, ';;; Vacuum wavelength of illumination [micrometers]'
-printf, lun, 'lambda = '+strtrim((*s).h.lambda)
+printf, lun, 'lambda = '+strtrim(h.lambda)
 printf, lun, ';;; Magnification [micrometers/pixel]'
-printf, lun, 'mpp = '+strtrim((*s).h.mpp)
+printf, lun, 'mpp = '+strtrim(h.mpp)
 printf, lun, ';;; Extract features from VOB'
 printf, lun, 'features = list()'
 printf, lun, 'while ~vob.eof do begin          & $'
