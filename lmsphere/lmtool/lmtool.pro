@@ -351,7 +351,7 @@ wzp = cw_fslider(wprofile, title = 'zp [pixels]', uvalue = 'ZP', value = (f.rp)[
 wnp = cw_fslider(wprofile, title = 'np', uvalue = 'NP', value = real_part(f.np), $
                  min = 1.33, max = 3.d, /double, /edit, /drag, /tab_mode)
 walpha = cw_fslider(wprofile, title = 'alpha', uvalue = 'ALPHA', value = f.alpha, $
-                    min = 0.5, max = 2., /double, /edit, /drag, /tab_mode)
+                    min = 0.4, max = 2., /double, /edit, /drag, /tab_mode)
 wrad = cw_field(wprofile, title = 'rad [pixel]', uvalue = 'RAD', value = fix(f.rad), $
                 /column, /return_events, /integer, /tab_mode)
 wap = cw_fslider(wprofile, title = 'ap [um]', uvalue = 'AP', value = f.ap, $
