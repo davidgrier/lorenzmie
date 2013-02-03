@@ -33,13 +33,13 @@
 ;    Uses lmtool procedures and functions to analyze in-line hologram.
 ;
 ; NOTES:
-;    Save routine
-;    Save parameters
 ;    View residuals
 ;    Implement and test GPU
 ;
 ; MODIFICATION HISTORY:
 ; 01/29/2013 Written by David G. Grier, New York University
+; 02/03/2013 DGG Initial versions of save procedures.  Increase range of
+;   ZP to 300 pixels.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -347,7 +347,7 @@ void = widget_label(wprofiletab, value = 'Particle Parameters', /align_left)
 wprofile = widget_base(wprofiletab, row = 2, /frame, /grid_layout, $
                        event_pro = 'lmt_update_parameter')
 wzp = cw_fslider(wprofile, title = 'zp [pixels]', uvalue = 'ZP', value = (f.rp)[2], $
-                 min = 0., max = 200., /double, /edit, /drag, /tab_mode)
+                 min = 0., max = 300., /double, /edit, /drag, /tab_mode)
 wnp = cw_fslider(wprofile, title = 'np', uvalue = 'NP', value = real_part(f.np), $
                  min = 1.33, max = 3.d, /double, /edit, /drag, /tab_mode)
 walpha = cw_fslider(wprofile, title = 'alpha', uvalue = 'ALPHA', value = f.alpha, $
