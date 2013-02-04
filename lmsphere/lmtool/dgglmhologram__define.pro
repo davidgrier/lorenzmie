@@ -159,7 +159,8 @@ function DGGlmHologram::Init, data, $
                               mpp, $
                               nm = nm, $
                               noise = noise, $
-                              deinterlace = deinterlace
+                              deinterlace = deinterlace, $
+                              smooth = smooth
 
 COMPILE_OPT IDL2, HIDDEN
 

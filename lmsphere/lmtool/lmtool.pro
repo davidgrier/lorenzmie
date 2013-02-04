@@ -473,7 +473,7 @@ end
 ;
 ; LMTOOL
 ;
-pro lmtool, a, lambda, mpp, nm = nm, deinterlace = deinterlace
+pro lmtool, a, lambda, mpp, nm = nm, deinterlace = deinterlace, smooth = smooth
 
 COMPILE_OPT IDL2
 
@@ -484,7 +484,7 @@ if n_params() ne 3 then begin
    return
 endif
 
-h = dgglmhologram(a, lambda, mpp, nm = nm, deinterlace = deinterlace)
+h = dgglmhologram(a, lambda, mpp, nm = nm, deinterlace = deinterlace, smooth = smooth)
 if ~isa(h, 'DGGlmHologram') then begin
    message, umsg, /inf
    message, 'could not initialize', /inf
