@@ -49,8 +49,14 @@
 ;        POSITION = n: return feature number n from list of
 ;            features in hologram.
 ;
+;
+; NOTES:
+;    Remove SMOOTH once CT_ routines have better noise performance.
+;
 ; MODIFICATION HISTORY:
 ; 01/27/2013 Written by David G. Grier, New York University
+; 02/04/2013 DGG Added smooth property as a temporary fix for finding
+;   features in noisy images.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -59,15 +65,16 @@
 ;
 ; DGGlmHologram::Findfeatures
 ;
-pro DGGlmHologram::Findfeatures
+pro DGGlmHologram::Findfeatures, smooth = smooth
 
 COMPILE_OPT IDL2, HIDDEN
 
-rp = ctfeature(*(self.data), noise = self.noise, deinterlace = self.deinterlace, $
+a = isa(smooth, /number, /scalar) ? smooth(*(self.data), smooth) : *(self.data)
+rp = ctfeature(a, noise = self.noise, deinterlace = self.deinterlace, $
                count = nfeatures, /quiet)
 
 if nfeatures gt 0 then begin
-   rad = ct_range(*(self.data), rp, noise = self.noise, deinterlace = self.deinterlace)
+   rad = ct_range(a, rp, noise = self.noise, deinterlace = self.deinterlace)
    for n = 0, nfeatures-1 do $
       self.add, dgglmfeature(parent = self, rp = rp[*, n], rad = rad[n])
 endif
@@ -97,7 +104,7 @@ if isa(data, /number, /array) then begin
          self.data = ptr_new(double(data))
          if isa(noise, /scalar, /number) then $
             self.noise = mad(*(self.data))
-         self.findfeatures
+         self.findfeatures, smooth = self.smooth
       endif
    endif
 endif
@@ -211,7 +218,10 @@ self.nm = isa(nm, /scalar, /number) ? dcomplex(nm) : refractiveindex(self.lambda
 if keyword_set(deinterlace) then $
    self.deinterlace = deinterlace
 
-self.findfeatures
+if isa(smooth, /scalar, /number) then $
+   self.smooth = smooth
+
+self.findfeatures, smooth = self.smooth
 
 return, 1
 end
@@ -246,6 +256,7 @@ struct = {DGGlmHologram,          $
           inherits IDL_Object,    $
           inherits IDL_Container, $
           data: ptr_new(),        $ ; normalized hologram
+          smooth: 0,              $ ; temporary smoothing factor for CT routines
           dim: [0L, 0L],          $ ; dimensions of hologram
           lambda: 0.d,            $ ; wavelength [micrometer]
           mpp: 0.d,               $ ; magnification [micrometer/pixel]
