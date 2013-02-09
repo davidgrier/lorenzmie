@@ -53,6 +53,7 @@ pro lmt_fit, ev
 COMPILE_OPT IDL2, HIDDEN
 
 widget_control, ev.top, get_uvalue = s
+widget_control, /hourglass
 h = (*s).p.h
 f = h -> get(position = (*s).p.n) ; selected feature
 fix = (*s).p.fix
@@ -73,6 +74,7 @@ f.delta = p1[0, 9]
 lmt_update_fit_plot, s
 lmt_update_parameter_widgets, s
 lmt_update_profile_plot, s
+widget_control, hourglass = 0
 end
 
 ;;;;;
