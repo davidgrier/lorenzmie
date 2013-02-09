@@ -108,7 +108,9 @@
 ; 02/04/2013 DGG Added SMOOTH keyword to improve performance with
 ;   noisy images.  Will retire this once CT routines have better 
 ;   noise performance.
-; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.
+; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.  Revise
+;   coordinate code to locate features relative to lower-left corner
+;   rather than relative to center of cropped image.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -202,7 +204,7 @@ if count ge 1 then $
 p = []
 for ndx = 0L, count - 1 do begin
    ;; Initial estimate for xp and yp
-   rp0 = rp[0:1, ndx]
+   rp0 = rp[0:1, ndx]           ; particle position in original image
 
    ;; Crop image to region of interest
    thisrad = rad[ndx]
@@ -215,11 +217,8 @@ for ndx = 0L, count - 1 do begin
       roi = plot(poly, /over, linestyle = '--', color = 'light green')
    endif
    aa = a[x0:x1, y0:y1]         ; cropped image
-   r0 = double([x0, y0])
-   r1 = double([x1, y1])
+   r0 = double([x0, y0])        ; lower-left corner
    rc = rp0 - r0                ; particle position in cropped image
-   origin = (r0 + r1)/2.d       ; center of cropped image
-   drc = rp0 - origin           ; particle displacement from center of cropped image
 
    ;; Estimate axial position as position of peak brightness in the
    ;; Rayleigh-Sommerfeld reconstruction: zp
@@ -290,7 +289,7 @@ for ndx = 0L, count - 1 do begin
    endif
 
    ;; 2D fit to refine estimates
-   p2 = [drc, reform(p1[0, *])] ; initial parameters from 1D fit
+   p2 = [rc, reform(p1[0, *])] ; initial parameters from 1D fit
    thisp = fitlmsphere(aa, p2, lambda, mpp, $
                        chisq = chisq, $
                        fixalpha = fixalpha, $
@@ -303,7 +302,7 @@ for ndx = 0L, count - 1 do begin
       continue
    endif
 
-   thisp[0,0:1] += origin       ; center in original image
+   thisp[0,0:1] += r0           ; center in original image
    
    if doreport then begin
       message, 'refined estimates:'+string(chisq), /inf
