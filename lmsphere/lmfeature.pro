@@ -108,12 +108,12 @@
 ; 02/04/2013 DGG Added SMOOTH keyword to improve performance with
 ;   noisy images.  Will retire this once CT routines have better 
 ;   noise performance.
+; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
 
 function lmfeature, a, lambda, mpp, $
-                    smooth = smooth, $ ; kludge until SG works
                     noise = noise, $
                     threshold = threshold, $
                     pickn = pickn, $
@@ -178,8 +178,7 @@ dographics = arg_present(graphics) || keyword_set(graphics)
 debug = keyword_set(debug)
 
 ;;; Find candidate features
-rp = ctfeature(isa(smooth, /number, /scalar) ? smooth(a, smooth) : a, $
-               noise = noise, threshold = threshold, $
+rp = ctfeature(a, noise = noise, threshold = threshold, $
                pickn = pickn, count = count, deinterlace = deinterlace)
 
 if doreport then $
@@ -197,8 +196,7 @@ if dographics then begin
 endif
 
 if count ge 1 then $
-   rad = ct_range(isa(smooth, /number, /scalar) ? smooth(a, smooth) : a, rp, $
-                  noise = noise, deinterlace = deinterlace)
+   rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
 p = []
