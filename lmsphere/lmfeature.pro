@@ -23,12 +23,8 @@
 ;    noise: Estimate for the RMS additive noise at each pixel.
 ;        Default: estimated from image
 ;
-;    threshold: Minimum weighting for a pixel to be considered part
-;        of a feature.
-;        Default: estimated from image
-;
 ;    pickn: Maximum number of features to consider.
-;        Default: Process all features above threshold
+;        Default: Process all features
 ;
 ;    Parameters for 3D feature location and characterization:
 ;    ap: ballpark radius of sphere [micrometers]
@@ -108,16 +104,16 @@
 ; 02/04/2013 DGG Added SMOOTH keyword to improve performance with
 ;   noisy images.  Will retire this once CT routines have better 
 ;   noise performance.
-; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.  Revise
+; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.  Revised
 ;   coordinate code to locate features relative to lower-left corner
-;   rather than relative to center of cropped image.
+;   rather than relative to center of cropped image.  Removed
+;   THRESHOLD keyword.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
 
 function lmfeature, a, lambda, mpp, $
                     noise = noise, $
-                    threshold = threshold, $
                     pickn = pickn, $
                     ap = ap0, $
                     np = np0, $
@@ -180,8 +176,8 @@ dographics = arg_present(graphics) || keyword_set(graphics)
 debug = keyword_set(debug)
 
 ;;; Find candidate features
-rp = ctfeature(a, noise = noise, threshold = threshold, $
-               pickn = pickn, count = count, deinterlace = deinterlace)
+rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
+               pickn = pickn, count = count)
 
 if doreport then $
    message, string(count, (count ne 1) ? 's' : '', $
@@ -225,7 +221,7 @@ for ndx = 0L, count - 1 do begin
    z = dindgen(50) * 4.d + 10.d ; NOTE: set range more intelligently
    res = rs1d(aa, z, rc, lambda = lambda/nm0, mpp = mpp)
    m = max(abs(res), loc)
-   zmax = z[loc]                ; axial position of intensity maximum [pixels]
+   zp = z[loc]                  ; axial position of intensity maximum [pixels]
 
    b = aziavg(aa, center = rc, rad = thisrad, $
               deinterlace = deinterlace) ; radial profile around center
@@ -238,11 +234,11 @@ for ndx = 0L, count - 1 do begin
       z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; zero crossings [pixels]
       ;; Compare radii to those of Bessel function
       x0 = [2.4048, 5.5201, 8.6537]                ; zeros of J0(x)
-      ap = zmax /(2.*k*mean(z0/x0) - 1.)           ; estimated radius [um]
+      ap = zp /(2.*k*mean(z0/x0) - 1.)             ; estimated radius [um]
    endif else $
       ap = ap0
 
-   zp = zmax + ap/mpp           ; improved axial position estimate [pixels]
+   ;; zp = zmax + ap/mpp           ; improved axial position estimate [pixels]
 
    ;; Estimate np: NOTE: currently uses input value: np0
 
