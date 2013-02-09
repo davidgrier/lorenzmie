@@ -11,10 +11,10 @@
 ;    Image analysis, holographic video microscopy, feature detection
 ;
 ; CALLING SEQUENCE:
-;    p = lmfeature(image, lambda, mpp)
+;    features = lmfeature(hologram, lambda, mpp)
 ;
 ; INPUTS:
-;    image: two-dimensional normalized holographic microscopy image.
+;    hologram: two-dimensional normalized holographic microscopy image.
 ;    lambda: vacuum wavelength of light [micrometers]
 ;    mpp: length calibration [micrometers per pixel]
 ;
@@ -52,18 +52,19 @@
 ;    quiet: If set, minimize output
 ;
 ; OUTPUTS:
-;    p: [10,2,npts] array of data for the features found in the image.
-;       npts: Number of features found
-;       p[0,*,n]: [xp, dxp] : x location and error [pixels]
-;       p[1,*,n]: [yp, dyp] : y location and error [pixels]
-;       p[2,*,n]: [zp, dzp] : z location and error [pixels]
-;       p[3,*,n]: [ap, dap] : radius and error [micrometers]
-;       p[4,*,n]: [np, dnp] : refractive index and error of sphere
-;       p[5,*,n]: [kp, dnp] : extinction coefficient and error of sphere
-;       p[6,*,n]: [nm, dnm] : refractive index of medium
-;       p[7,*,n]: [km, dkm] : extinction coefficient of medium
-;       p[8,*,n]: [alpha, dalpha] : relative illumination amplitude
-;       p[9,*,n]: [delta, ddelta] : wavefront distortion
+;    features: list() of parameters describing each of the features
+;       in the hologram.  For the n-th feature:
+;    p = features[n]:
+;    p[0:1, 0]: [xp, dxp] : x location and error [pixels]
+;    p[0:1, 1]: [yp, dyp] : y location and error [pixels]
+;    p[0:1, 2]: [zp, dzp] : z location and error [pixels]
+;    p[0:1, 3]: [ap, dap] : radius and error [micrometers]
+;    p[0:1, 4]: [np, dnp] : refractive index and error of sphere
+;    p[0:1, 5]: [kp, dnp] : extinction coefficient and error of sphere
+;    p[0:1, 6]: [nm, dnm] : refractive index of medium
+;    p[0:1, 7]: [km, dkm] : extinction coefficient of medium
+;    p[0:1, 8]: [alpha, dalpha] : relative illumination amplitude
+;    p[0:1, 9]: [delta, ddelta] : wavefront distortion
 ;      
 ; PROCEDURE:
 ;   CT_FEATURE identifies candidate features using CIRCLETRANSFORM.
@@ -107,7 +108,8 @@
 ; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.  Revised
 ;   coordinate code to locate features relative to lower-left corner
 ;   rather than relative to center of cropped image.  Removed
-;   THRESHOLD keyword.  Features returned as list.
+;   THRESHOLD keyword.  Features returned as list.  Return empty list
+;   on failure.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -130,17 +132,19 @@ COMPILE_OPT IDL2
 
 umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
 
+features = list()
+
 ;;; Process command line parameters
 if n_params() ne 3 then begin
    message, umsg, /inf
-   return, -1
+   return, features
 endif
 
 sz = size(a)
 if ~isa(a, /number, /array) or sz[0] ne 2 then begin
    message, umsg, /inf
    message, 'A must be a two-dimensional normalized hologram', /inf
-   return, -1
+   return, features
 endif
 width = sz[1]
 height = sz[2]
@@ -148,13 +152,13 @@ height = sz[2]
 if ~isa(lambda, /number, /scalar) then begin
    message, umsg, /inf
    message, 'LAMBDA must be a number', /inf
-   return, -1
+   return, features
 endif
 
 if ~isa(mpp, /number, /scalar) then begin
    message, umsg, /inf
    message, 'MPP must be a number', /inf
-   return, -1
+   return, features
 endif
 
 if ~isa(np0, /number, /scalar) then $
@@ -197,7 +201,6 @@ if count ge 1 then $
    rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
-features = list()
 for ndx = 0L, count - 1 do begin
    ;; Initial estimate for xp and yp
    rp0 = rp[0:1, ndx]           ; particle position in original image
