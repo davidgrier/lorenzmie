@@ -107,7 +107,7 @@
 ; 02/09/2013 DGG Fixed noise performance; retired SMOOTH.  Revised
 ;   coordinate code to locate features relative to lower-left corner
 ;   rather than relative to center of cropped image.  Removed
-;   THRESHOLD keyword.
+;   THRESHOLD keyword.  Features returned as list.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -197,7 +197,7 @@ if count ge 1 then $
    rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
-p = []
+features = list()
 for ndx = 0L, count - 1 do begin
    ;; Initial estimate for xp and yp
    rp0 = rp[0:1, ndx]           ; particle position in original image
@@ -208,13 +208,13 @@ for ndx = 0L, count - 1 do begin
    x1 = round(rp0[0] + thisrad) < width - 1L
    y0 = round(rp0[1] - thisrad) > 0L
    y1 = round(rp0[1] + thisrad) < height - 1L
+   aa = a[x0:x1, y0:y1]         ; cropped image
+   r0 = double([x0, y0])        ; lower-left corner
+   rc = rp0 - r0                ; particle position in cropped image
    if dographics then begin
       poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
       roi = plot(poly, /over, linestyle = '--', color = 'light green')
    endif
-   aa = a[x0:x1, y0:y1]         ; cropped image
-   r0 = double([x0, y0])        ; lower-left corner
-   rc = rp0 - r0                ; particle position in cropped image
 
    ;; Estimate axial position as position of peak brightness in the
    ;; Rayleigh-Sommerfeld reconstruction: zp
@@ -286,39 +286,39 @@ for ndx = 0L, count - 1 do begin
 
    ;; 2D fit to refine estimates
    p2 = [rc, reform(p1[0, *])] ; initial parameters from 1D fit
-   thisp = fitlmsphere(aa, p2, lambda, mpp, $
-                       chisq = chisq, $
-                       fixalpha = fixalpha, $
-                       fixdelta = fixdelta || peggedalpha, $
-                       deinterlace = deinterlace, $
-                       object = gpu, $
-                       quiet = ~debug)
-   if n_elements(thisp) eq 1 then begin ; fit failed
-      message, 'fit failed -- continuing', /inf
+   feature = fitlmsphere(aa, p2, lambda, mpp, $
+                         chisq = chisq, $
+                         fixalpha = fixalpha, $
+                         fixdelta = fixdelta || peggedalpha, $
+                         deinterlace = deinterlace, $
+                         object = gpu, $
+                         quiet = ~debug)
+   if n_elements(feature) eq 1 then begin ; fit failed
+      message, 'fit failed -- skipping this feature', /inf
       continue
    endif
 
-   thisp[0,0:1] += r0           ; center in original image
+   feature[0,0:1] += r0         ; center in original image
    
    if doreport then begin
-      message, 'refined estimates:'+string(chisq), /inf
-      message, string(thisp[0, 0:2], $
+      message, 'refined estimates:' + string(chisq), /inf
+      message, string(feature[0, 0:2], $
                       format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
-      message, string(thisp[0, 3:4], $
+      message, string(feature[0, 3:4], $
                       format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-      message, string(thisp[0, 8:9], $
+      message, string(feature[0, 8:9], $
                       format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
       message, /inf
    endif
 
    if dographics then begin
       roi.setproperty, color = 'green'
-      rp[0:1,ndx] = thisp[0,0:1]
+      rp[0:1,ndx] = feature[0,0:1]
       pf.putdata, rp[0,*], rp[1,*]
    endif
 
-   p = [[[p]], [[thisp]]]
+   features.add, feature
 endfor
 
-return, p
+return, features
 end
