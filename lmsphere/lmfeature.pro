@@ -110,12 +110,14 @@
 ;   rather than relative to center of cropped image.  Removed
 ;   THRESHOLD keyword.  Features returned as list.  Return empty list
 ;   on failure.
+; 02/14/2013 DGG Fixed deinterlace for cropped images.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
 
 function lmfeature, a, lambda, mpp, $
                     noise = noise, $
+                    rad = _rad, $
                     pickn = pickn, $
                     ap = ap0, $
                     np = np0, $
@@ -198,7 +200,8 @@ if dographics then begin
 endif
 
 if count ge 1 then $
-   rad = ct_range(a, rp, noise = noise, deinterlace = deinterlace)
+   rad = isa(_rad, /scalar, /number) ? replicate(_rad, count) : $
+         ct_range(a, rp, noise = noise, deinterlace = deinterlace)
 
 ;;; Loop over features to process each feature
 for ndx = 0L, count - 1 do begin
@@ -293,7 +296,7 @@ for ndx = 0L, count - 1 do begin
                          chisq = chisq, $
                          fixalpha = fixalpha, $
                          fixdelta = fixdelta || peggedalpha, $
-                         deinterlace = deinterlace, $
+                         deinterlace = keyword_set(deinterlace) ? deinterlace + y0 : 0, $
                          object = gpu, $
                          quiet = ~debug)
    if n_elements(feature) eq 1 then begin ; fit failed
