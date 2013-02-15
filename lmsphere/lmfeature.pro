@@ -111,6 +111,7 @@
 ;   THRESHOLD keyword.  Features returned as list.  Return empty list
 ;   on failure.
 ; 02/14/2013 DGG Fixed deinterlace for cropped images.
+; 02/15/2013 DGG Crop to odd dimensions.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -126,6 +127,7 @@ function lmfeature, a, lambda, mpp, $
                     fixdelta = fixdelta, $
                     gpu = gpu, $
                     deinterlace = deinterlace, $
+                    chisq = chisq, $
                     graphics = graphics, $
                     quiet = quiet, $
                     debug = debug
@@ -135,6 +137,7 @@ COMPILE_OPT IDL2
 umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
 
 features = list()
+chisq = list()
 
 ;;; Process command line parameters
 if n_params() ne 3 then begin
@@ -211,9 +214,9 @@ for ndx = 0L, count - 1 do begin
    ;; Crop image to region of interest
    thisrad = rad[ndx]
    x0 = round(rp0[0] - thisrad) > 0L
-   x1 = round(rp0[0] + thisrad) < width - 1L
+   x1 = round(rp0[0] + thisrad + 1) < width - 1L
    y0 = round(rp0[1] - thisrad) > 0L
-   y1 = round(rp0[1] + thisrad) < height - 1L
+   y1 = round(rp0[1] + thisrad + 1) < height - 1L
    aa = a[x0:x1, y0:y1]         ; cropped image
    r0 = double([x0, y0])        ; lower-left corner
    rc = rp0 - r0                ; particle position in cropped image
@@ -265,7 +268,7 @@ for ndx = 0L, count - 1 do begin
    ;; Improve estimates by fitting to azimuthally averaged image
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
          real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
-   p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = chisq, /quiet)
+   p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
 
    ;; Some fits fail with alpha = 2.0; have to fixdelta.
    peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
@@ -276,7 +279,7 @@ for ndx = 0L, count - 1 do begin
 
    ;; Improved estimates
    if doreport then begin
-      message, 'improved estimates:'+string(chisq), /inf
+      message, 'improved estimates:'+string(thischisq), /inf
       message, string(rp0, p1[0, 0], thisrad, $
                       format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
       message, string(p1[0, 1:2], $
@@ -292,38 +295,39 @@ for ndx = 0L, count - 1 do begin
 
    ;; 2D fit to refine estimates
    p2 = [rc, reform(p1[0, *])] ; initial parameters from 1D fit
-   feature = fitlmsphere(aa, p2, lambda, mpp, $
-                         chisq = chisq, $
-                         fixalpha = fixalpha, $
-                         fixdelta = fixdelta || peggedalpha, $
-                         deinterlace = keyword_set(deinterlace) ? deinterlace + y0 : 0, $
-                         object = gpu, $
-                         quiet = ~debug)
-   if n_elements(feature) eq 1 then begin ; fit failed
+   thisfeature = fitlmsphere(aa, p2, lambda, mpp, $
+                             chisq = thischisq, $
+                             fixalpha = fixalpha, $
+                             fixdelta = fixdelta || peggedalpha, $
+                             deinterlace = keyword_set(deinterlace) ? deinterlace + y0 : 0, $
+                             object = gpu, $
+                             quiet = ~debug)
+   if n_elements(thisfeature) eq 1 then begin ; fit failed
       message, 'fit failed -- skipping this feature', /inf
       continue
    endif
 
-   feature[0,0:1] += r0         ; center in original image
+   thisfeature[0,0:1] += r0     ; center in original image
    
    if doreport then begin
-      message, 'refined estimates:' + string(chisq), /inf
-      message, string(feature[0, 0:2], $
+      message, 'refined estimates:' + string(thischisq), /inf
+      message, string(thisfeature[0, 0:2], $
                       format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
-      message, string(feature[0, 3:4], $
+      message, string(thisfeature[0, 3:4], $
                       format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-      message, string(feature[0, 8:9], $
+      message, string(thisfeature[0, 8:9], $
                       format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
       message, /inf
    endif
 
    if dographics then begin
       roi.setproperty, color = 'green'
-      rp[0:1,ndx] = feature[0,0:1]
+      rp[0:1,ndx] = thisfeature[0,0:1]
       pf.putdata, rp[0,*], rp[1,*]
    endif
 
-   features.add, feature
+   chisq.add, thischisq
+   features.add, thisfeature
 endfor
 
 return, features
