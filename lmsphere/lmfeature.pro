@@ -112,7 +112,8 @@
 ;   on failure.
 ; 02/14/2013 DGG Fixed deinterlace for cropped images.
 ; 02/15/2013 DGG Crop to odd dimensions.
-; 02/16/2013 DGG Introduced lmf_report to clean up reporting.
+; 02/16/2013 DGG Introduced lmf_report to clean up reporting.  Use
+;   information about radius to estimate axial position.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -121,7 +122,6 @@ pro lmf_report, msg, p
 COMPILE_OPT IDL2, HIDDEN
 
 message, msg, /inf
-thisp = size(p, /n_dimensions) eq 2 ? p[0,*] : p
 message, string(p[0:2], $
                 format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
 message, string(p[3:4], $
@@ -205,7 +205,13 @@ debug = keyword_set(debug)
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
                pickn = pickn, count = count)
 
-if doreport then message, 'features found: ' + strtrim(count, 2), /inf
+if doreport then begin
+   print
+   message, 'noise: ' + strtrim(noise, 2), /inf
+   if keyword_set(deinterlace) then $
+      message, 'analyzing ' + ((deinterlace mod 2) ? 'even' : 'odd') + ' field', /inf
+   message, 'features found: ' + strtrim(count, 2), /inf
+endif
 
 if dographics then begin
    if isa(graphics, 'graphicswin') then $
@@ -231,9 +237,9 @@ for ndx = 0L, count - 1 do begin
    ;; Crop image to region of interest
    thisrad = rad[ndx]
    x0 = round(rp0[0] - thisrad) > 0L
-   x1 = round(rp0[0] + thisrad + 1) < width - 1L
+   x1 = round(rp0[0] + thisrad + 1L) < width - 1L
    y0 = round(rp0[1] - thisrad) > 0L
-   y1 = round(rp0[1] + thisrad + 1) < height - 1L
+   y1 = round(rp0[1] + thisrad + 1L) < height - 1L
    aa = a[x0:x1, y0:y1]         ; cropped image
    r0 = double([x0, y0])        ; lower-left corner
    rc = rp0 - r0                ; particle position in cropped image
@@ -243,42 +249,49 @@ for ndx = 0L, count - 1 do begin
       roi = plot(poly, /over, linestyle = '--', color = 'light green')
    endif
 
-   ;; Estimate axial position as position of peak brightness in the
-   ;; Rayleigh-Sommerfeld reconstruction: zp
-   z = dindgen(50) * 4.d + 10.d ; NOTE: set range more intelligently
-   res = rs1d(aa, z, rc, lambda = lambda/nm0, mpp = mpp)
-   m = max(abs(res), loc)
-   zp = z[loc]                  ; axial position of intensity maximum [pixels]
-
+   ;; Use radial profile to improve estimates for parameters
    b = aziavg(aa, center = rc, rad = thisrad, $
               deinterlace = deinterlace) ; radial profile around center
-   
-   ;; Model observed interference pattern as Poisson's spot
-   ;; to estimate radius of particle: ap
+
+   ;; Model observed interference pattern as Poisson's spot to
+   ;; relate axial position, zp, and sphere radius, ap
+   c = fix(b ge 1)
+   z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; FIXME: zero crossings
+   j0n = [2.4048, 5.5201, 8.6537]               ; zeros of J0(x)
+   fac = 2.*k*mean(z0/j0n) - 1.
    if doap then begin
-      ;; Compare radii of intensity minima to zeros of Bessel functions
-      c = fix(b ge 1)
-      z0 = float(where(abs(c - c[1:*]) gt 0)) + 1.
-      j0n = [2.4048, 5.5201, 8.6537]    ; zeros of J0(x)
-      ap = zp /(2.*k*mean(z0/j0n) - 1.) ; estimated radius [um]
-   endif else $
+      ;; Estimate axial position as position of peak brightness in the
+      ;; Rayleigh-Sommerfeld reconstruction: zp
+      z = dindgen(50) * 4.d + 10.d ; FIXME: set range more intelligently
+      res = rs1d(aa, z, rc, lambda = lambda/nm0, mpp = mpp)
+      m = max(abs(res), loc)
+      zp = z[loc]                       ; axial position [pixels]
+      ;; Estimate radius using model
+      ap = zp /fac ; estimated radius [um]
+   endif else begin
+      ;; Use provided radius
       ap = ap0
+      ;; Estimate axial position using model
+      zp = ap * fac
+   endelse
 
-   ;; zp = zmax + ap/mpp           ; improved axial position estimate [pixels]
-
-   ;; Estimate np: NOTE: currently uses input value: np0
+   ;; Estimate np: FIXME: currently uses input value: np0
 
    ;; Estimate alpha and delta
    alpha = 1.d
    delta = 0.d
 
-   ;; Improve estimates by fitting to azimuthally averaged image
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
          real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
 
    if doreport then lmf_report, 'starting estimates:', [rp0, p0]
 
+   ;; Improve estimates by fitting to azimuthally averaged image
    p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
+   if ~finite(thischisq) then begin
+      message, 'parameter estimate failed -- skipping this feature', /inf
+      continue
+   endif
 
    ;; Some fits fail with alpha = 2.0; have to fixdelta.
    peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
@@ -311,7 +324,7 @@ for ndx = 0L, count - 1 do begin
 
    thisfeature[0,0:1] += r0     ; center in original image
    
-   if doreport then lmf_report, 'refined estimates: ' + string(thischisq), thisfeature
+   if doreport then lmf_report, 'refined estimates: ' + string(thischisq), thisfeature[0, *]
 
    if dographics then begin
       roi.setproperty, color = 'green'
