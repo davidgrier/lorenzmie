@@ -112,9 +112,26 @@
 ;   on failure.
 ; 02/14/2013 DGG Fixed deinterlace for cropped images.
 ; 02/15/2013 DGG Crop to odd dimensions.
+; 02/16/2013 DGG Introduced lmf_report to clean up reporting.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
+pro lmf_report, msg, p
+
+COMPILE_OPT IDL2, HIDDEN
+
+message, msg, /inf
+thisp = size(p, /n_dimensions) eq 2 ? p[0,*] : p
+message, string(p[0:2], $
+                format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
+message, string(p[3:4], $
+                format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
+message, string(p[8:9], $
+                format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
+message, /inf
+
+return
+end
 
 function lmfeature, a, lambda, mpp, $
                     noise = noise, $
@@ -188,9 +205,7 @@ debug = keyword_set(debug)
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
                pickn = pickn, count = count)
 
-if doreport then $
-   message, string(count, (count ne 1) ? 's' : '', $
-                   format = '(I0," feature",A," found")'), /inf
+if doreport then message, 'features found: ' + strtrim(count, 2), /inf
 
 if dographics then begin
    if isa(graphics, 'graphicswin') then $
@@ -208,6 +223,8 @@ if count ge 1 then $
 
 ;;; Loop over features to process each feature
 for ndx = 0L, count - 1 do begin
+   if doreport then message, 'feature ' + strtrim(ndx, 2), /inf
+
    ;; Initial estimate for xp and yp
    rp0 = rp[0:1, ndx]           ; particle position in original image
 
@@ -220,6 +237,7 @@ for ndx = 0L, count - 1 do begin
    aa = a[x0:x1, y0:y1]         ; cropped image
    r0 = double([x0, y0])        ; lower-left corner
    rc = rp0 - r0                ; particle position in cropped image
+
    if dographics then begin
       poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
       roi = plot(poly, /over, linestyle = '--', color = 'light green')
@@ -238,12 +256,11 @@ for ndx = 0L, count - 1 do begin
    ;; Model observed interference pattern as Poisson's spot
    ;; to estimate radius of particle: ap
    if doap then begin
-      ;; Find radii of "zero" crossings
+      ;; Compare radii of intensity minima to zeros of Bessel functions
       c = fix(b ge 1)
-      z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; zero crossings [pixels]
-      ;; Compare radii to those of Bessel function
-      x0 = [2.4048, 5.5201, 8.6537]                ; zeros of J0(x)
-      ap = zp /(2.*k*mean(z0/x0) - 1.)             ; estimated radius [um]
+      z0 = float(where(abs(c - c[1:*]) gt 0)) + 1.
+      j0n = [2.4048, 5.5201, 8.6537]    ; zeros of J0(x)
+      ap = zp /(2.*k*mean(z0/j0n) - 1.) ; estimated radius [um]
    endif else $
       ap = ap0
 
@@ -255,38 +272,23 @@ for ndx = 0L, count - 1 do begin
    alpha = 1.d
    delta = 0.d
 
-   ;; Starting estimates
-   if doreport then begin
-      message, 'feature: '+strtrim(ndx,2), /inf
-      message, 'starting estimates:', /inf
-      message, string(rp0, zp, thisrad, $
-                      format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
-      message, string(ap, real_part(np0), $
-                      format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-   endif      
-
    ;; Improve estimates by fitting to azimuthally averaged image
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
          real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
+
+   if doreport then lmf_report, 'starting estimates:', [rp0, p0]
+
    p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
 
    ;; Some fits fail with alpha = 2.0; have to fixdelta.
    peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
    if peggedalpha then begin
       message, 'alpha pegged, fixing delta', /inf
-      p1 = fitlmsphere1d(b, p0, lambda, mpp, /fixdelta, /quiet)
+      p1 = fitlmsphere1d(b, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
    endif
-
-   ;; Improved estimates
-   if doreport then begin
-      message, 'improved estimates:'+string(thischisq), /inf
-      message, string(rp0, p1[0, 0], thisrad, $
-                      format = '("  rp = (",I0,", ",I0,", ",I0,") +/- ",I0)'), /inf
-      message, string(p1[0, 1:2], $
-                      format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-      message, string(p1[0, 6:7], $
-                      format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
-   endif
+   
+   if doreport then lmf_report, 'improved estimates: ' + string(thischisq), $
+                                [rp0, reform(p1[0, *])]
 
    if dographics then begin
       rp[0:1,ndx] = rp0
@@ -309,16 +311,7 @@ for ndx = 0L, count - 1 do begin
 
    thisfeature[0,0:1] += r0     ; center in original image
    
-   if doreport then begin
-      message, 'refined estimates:' + string(thischisq), /inf
-      message, string(thisfeature[0, 0:2], $
-                      format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
-      message, string(thisfeature[0, 3:4], $
-                      format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-      message, string(thisfeature[0, 8:9], $
-                      format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
-      message, /inf
-   endif
+   if doreport then lmf_report, 'refined estimates: ' + string(thischisq), thisfeature
 
    if dographics then begin
       roi.setproperty, color = 'green'
