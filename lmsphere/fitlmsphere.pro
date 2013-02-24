@@ -150,6 +150,7 @@
 ; 01/14/2013 DGG Added CHISQ keyword.
 ; 01/26/2013 DGG Compute coordinates relative to lower-left corner of
 ;    image rather than center.  Correctly ignore deinterlace = 0.
+; 02/24/2013 DGG sample ERR when deinterlacing.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -271,7 +272,6 @@ if ~isa(precision, /scalar, /number) then $
 if n_elements(gpu) ne 1 then $
    gpu = 0.
 
-
 sz = size(a, /dimensions)
 nx = sz[0]
 ny = sz[1]
@@ -352,6 +352,7 @@ if keyword_set(object) then begin
    aa = double(a)
    if keyword_set(deinterlace) then begin
       w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
+      err = err[*, w]
       aa = aa[*, w]
    endif
       
@@ -369,10 +370,11 @@ endif else begin
    aa = double(reform(a, npts))
 
    if keyword_set(deinterlace) then begin
-      w = where((y mod 2) eq (deinterlace mod 2), npts)
+      w = where((y mod 2) eq (deinterlace mod 2))
       x = x[w]
       y = y[w]
       aa = aa[w]
+      err = err[w]
    endif
 
 ; parameters passed to the fitting function

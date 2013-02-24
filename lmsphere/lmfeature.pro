@@ -65,6 +65,8 @@
 ;    p[0:1, 7]: [km, dkm] : extinction coefficient of medium
 ;    p[0:1, 8]: [alpha, dalpha] : relative illumination amplitude
 ;    p[0:1, 9]: [delta, ddelta] : wavefront distortion
+;    p[0,  10]: range of region of interest
+;    p[1,  10]: chi-squared value of fit
 ;      
 ; PROCEDURE:
 ;   CT_FEATURE identifies candidate features using CIRCLETRANSFORM.
@@ -114,28 +116,13 @@
 ; 02/15/2013 DGG Crop to odd dimensions.
 ; 02/16/2013 DGG Introduced lmf_report to clean up reporting.  Use
 ;   information about radius to estimate axial position.
+; 02/24/2013 DGG Use LMF_RANGE to compute range.  Return RAD and CHISQ
+;   with parameters for each feature.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
-pro lmf_report, msg, p
-
-COMPILE_OPT IDL2, HIDDEN
-
-message, msg, /inf
-message, string(p[0:2], $
-                format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
-message, string(p[3:4], $
-                format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-message, string(p[8:9], $
-                format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
-message, /inf
-
-return
-end
-
 function lmfeature, a, lambda, mpp, $
                     noise = noise, $
-                    rad = _rad, $
                     pickn = pickn, $
                     ap = ap0, $
                     np = np0, $
@@ -144,7 +131,6 @@ function lmfeature, a, lambda, mpp, $
                     fixdelta = fixdelta, $
                     gpu = gpu, $
                     deinterlace = deinterlace, $
-                    chisq = chisq, $
                     graphics = graphics, $
                     quiet = quiet, $
                     debug = debug
@@ -154,7 +140,6 @@ COMPILE_OPT IDL2
 umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
 
 features = list()
-chisq = list()
 
 ;;; Process command line parameters
 if n_params() ne 3 then begin
@@ -223,10 +208,6 @@ if dographics then begin
              linestyle = '', symbol = 'o', color = 'red')
 endif
 
-if count ge 1 then $
-   rad = isa(_rad, /scalar, /number) ? replicate(_rad, count) : $
-         ct_range(a, rp, noise = noise, deinterlace = deinterlace)
-
 ;;; Loop over features to process each feature
 for ndx = 0L, count - 1 do begin
    if doreport then message, 'feature ' + strtrim(ndx, 2), /inf
@@ -235,7 +216,7 @@ for ndx = 0L, count - 1 do begin
    rp0 = rp[0:1, ndx]           ; particle position in original image
 
    ;; Crop image to region of interest
-   thisrad = rad[ndx]
+   thisrad = lmf_range(a, rp0, deinterlace = deinterlace)
    x0 = round(rp0[0] - thisrad) > 0L
    x1 = round(rp0[0] + thisrad + 1L) < width - 1L
    y0 = round(rp0[1] - thisrad) > 0L
@@ -246,10 +227,10 @@ for ndx = 0L, count - 1 do begin
 
    if dographics then begin
       poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
-      roi = plot(poly, /over, linestyle = '--', color = 'light green')
+      roi = plot(poly, over = graphics, linestyle = '--', color = 'light green')
    endif
 
-   ;; Use radial profile to improve estimates for parameters
+  ;; Use radial profile to estimate parameters
    b = aziavg(aa, center = rc, rad = thisrad, $
               deinterlace = deinterlace) ; radial profile around center
 
@@ -284,23 +265,27 @@ for ndx = 0L, count - 1 do begin
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
          real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
 
-   if doreport then lmf_report, 'starting estimates:', [rp0, p0]
+   if debug then lmf_report, 'starting estimates:', [rp0, p0]
 
-   ;; Improve estimates by fitting to azimuthally averaged image
+   ;; Improve estimates by fitting to radial profile
    p1 = fitlmsphere1d(b, p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
+   if ~finite(thischisq) then begin
+      message, 'parameter estimate failed -- trying again with fixed delta', /inf
+      p1 = fitlmsphere1d(b, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
+   endif else begin
+      ;; Some fits fail with alpha = 2.0; have to fixdelta.
+      peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
+      if peggedalpha then begin
+         message, 'estimate for alpha exceeds bounds -- trying again with fixed delta', /inf
+         p1 = fitlmsphere1d(b, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
+      endif
+   endelse
    if ~finite(thischisq) then begin
       message, 'parameter estimate failed -- skipping this feature', /inf
       continue
    endif
-
-   ;; Some fits fail with alpha = 2.0; have to fixdelta.
-   peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
-   if peggedalpha then begin
-      message, 'alpha pegged, fixing delta', /inf
-      p1 = fitlmsphere1d(b, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
-   endif
    
-   if doreport then lmf_report, 'improved estimates: ' + string(thischisq), $
+   if debug then lmf_report, 'improved estimates: ' + string(thischisq), $
                                 [rp0, reform(p1[0, *])]
 
    if dographics then begin
@@ -324,7 +309,7 @@ for ndx = 0L, count - 1 do begin
 
    thisfeature[0,0:1] += r0     ; center in original image
    
-   if doreport then lmf_report, 'refined estimates: ' + string(thischisq), thisfeature[0, *]
+   if doreport then lmf_report, 'chisq: ' + string(thischisq), thisfeature[0, *]
 
    if dographics then begin
       roi.setproperty, color = 'green'
@@ -332,8 +317,7 @@ for ndx = 0L, count - 1 do begin
       pf.putdata, rp[0,*], rp[1,*]
    endif
 
-   chisq.add, thischisq
-   features.add, thisfeature
+   features.add, [[thisfeature], [thisrad, thisrad]]
 endfor
 
 return, features
