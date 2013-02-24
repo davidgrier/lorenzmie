@@ -1,3 +1,19 @@
+;+
+; NAME:
+;    lmf_report
+;
+; PURPOSE:
+;    Report parameters obtained with lmfeature
+;
+; CATEGORY:
+;    Holographic video microscopy
+;
+; MODIFICATION HISTORY:
+; 02/24/2013 Written by David G. Grier, New York University
+;
+; Copyright (c) 2013 David G. Grier
+;-
+
 pro lmf_report, msg, p
 
 COMPILE_OPT IDL2, HIDDEN
