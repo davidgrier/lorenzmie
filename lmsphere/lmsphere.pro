@@ -81,6 +81,7 @@
 ;    Major change: Coordinates computed relative to lower-left corner,
 ;    rather than relative to center.  Simplifies interpretation of
 ;    coordinates and eliminates off-by-one and off-by-half errors.
+; 03/06/2013 DGG Implementation of stratified spheres.
 ;
 ; Copyright (c) 2007-2013 David G. Grier
 ;-
@@ -115,15 +116,21 @@ if ~isa(rp, /number, /array) then begin
    return, -1
 endif
 
-if ~isa(ap, /number, /scalar) then begin
+if ~isa(ap, /number) then begin
    message, umsg, /inf
    message, 'AP should be the radius of the sphere in micrometers', /inf
    return, -1
 endif
 
-if ~isa(np, /number, /scalar) then begin
+if ~isa(np, /number) then begin
    message, umsg, /inf
    message, 'NP should be the (complex) refractive index of the sphere', /inf
+   return, -1
+endif
+
+if n_elements(np) ne n_elements(ap) then begin
+   message, umsg, /inf
+   message, 'NP should have the same number of elements as AP', /inf
    return, -1
 endif
 

@@ -31,6 +31,7 @@
 ;
 ; MODIFICATION HISTORY:
 ; 02/24/2013 Written by David G. Grier, New York University
+; 03/03/2013 DGG Simplified where logic.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -40,7 +41,5 @@ function lmf_range, a, rc, deinterlace = deinterlace
 COMPILE_OPT IDL2
 
 sigma = azistd(a, avg, center = rc, deinterlace = deinterlace)
-w = where(abs(avg - 1.) ge sigma, ngood)
-
-return, (ngood gt 0) ? max(w) > 30 : 30
+return, max(where(abs(avg - 1.) ge sigma)) > 30
 end

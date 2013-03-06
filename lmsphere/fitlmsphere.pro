@@ -221,6 +221,7 @@ function fitlmsphere, a, $                    ; image
                       p0, $                   ; starting estimates for parameters
                       lambda, $               ; wavelength of light [micrometers]
                       mpp, $                  ; micrometers per pixel
+                      weight = weight, $      ; estimate for weighting at each pixel
                       chisq = chisq, $        ; chi-squared value of fit
                       aplimits = aplimits, $  ; limits on ap [micrometers]
                       nplimits = nplimits, $  ; limits on np
@@ -277,7 +278,8 @@ nx = sz[0]
 ny = sz[1]
 npts = nx*ny
 
-err = replicate(1., npts) ; FIXME: estimate for pixel noise
+if n_elements(err) ne npts then $
+   err = replicate(1., npts)    ; FIXME: estimate for pixel noise
 
 ;;; Constraints on fitting parameters
 nparams = n_elements(p0)
@@ -382,6 +384,7 @@ endif else begin
 
 ; perform fit
    p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
+                  weights = err, $
                   parinfo = parinfo, /fastnorm, $
                   perror = perror, bestnorm = chisq, dof = dof, $
                   status = status, errmsg = errmsg, quiet = quiet, $
