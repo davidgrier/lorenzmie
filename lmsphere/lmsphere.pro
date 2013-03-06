@@ -36,6 +36,8 @@
 ;    delta: wavefront distortion [wavelengths]
 ;           Default: 0.
 ;
+;    field: On output, field in imaging plane
+;
 ;    precision: relative precision with which fields are calculated.
 ;
 ; KEYWORD FLAGS:
@@ -81,7 +83,8 @@
 ;    Major change: Coordinates computed relative to lower-left corner,
 ;    rather than relative to center.  Simplifies interpretation of
 ;    coordinates and eliminates off-by-one and off-by-half errors.
-; 03/06/2013 DGG Implementation of stratified spheres.
+; 03/06/2013 DGG Implementation of stratified spheres.  Added FIELD
+;    keyword.
 ;
 ; Copyright (c) 2007-2013 David G. Grier
 ;-
@@ -89,6 +92,7 @@
 function lmsphere, rp, ap, np, nm, lambda, mpp, dim, $
                    alpha = alpha, $
                    delta = delta, $
+                   field = field, $
                    precision = precision, $
                    gpu = gpu
 
