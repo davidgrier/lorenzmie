@@ -100,13 +100,15 @@
 ; 06/18/2012 DGG Added GetProperty method for AB: scattering
 ;    coefficients may be provided instead of being computed.
 ; 10/13/2012 DGG Added DELTA property.  Renamed to DGGdhmLMSphere
+; 03/13/2013 DGG origin of coordinate system is moved to lower-left
+;    corner, rather than center.
 ;
 ; NOTES:
 ; Implement CPU calculations for systems without GPULib.
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; 
-; Copyright (c) 2011-2012 David G. Grier
+; Copyright (c) 2011-2013 David G. Grier
 ;-    
 ;;;;
 ;
@@ -149,8 +151,8 @@ gpu = *(self.gpu)               ; structure of GPU variables
 
 nx = double(self.dim[0])
 ny = double(self.dim[1])
-xc = (nx - 1.d)/2.d + self.rp[0]
-yc = (ny - 1.d)/2.d + self.rp[1]
+xc = self.rp[0]
+yc = self.rp[1]
 
 ; handle deinterlacing
 fac = 1.d

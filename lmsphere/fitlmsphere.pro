@@ -151,6 +151,7 @@
 ; 01/26/2013 DGG Compute coordinates relative to lower-left corner of
 ;    image rather than center.  Correctly ignore deinterlace = 0.
 ; 02/24/2013 DGG sample ERR when deinterlacing.
+; 03/13/2013 DGG correct deinterlace code for object fitting.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -352,6 +353,7 @@ if keyword_set(object) then begin
    endif
 
    aa = double(a)
+   err = reform(err, nx, ny)
    if keyword_set(deinterlace) then begin
       w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
       err = err[*, w]
