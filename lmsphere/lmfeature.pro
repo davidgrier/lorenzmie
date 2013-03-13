@@ -380,7 +380,7 @@ refit:
       continue
    endif
    if max(abs(rc - thisfeature[0, 0:1])) gt 0.6 then begin
-      if ~dorefit then begin
+      if dorefit eq 0 then begin
          dorefit = 1
          rp0 = reform(thisfeature[0, 0:1]) + roi[0:1]
          message, 'large displacement -- refitting', /inf
