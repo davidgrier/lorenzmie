@@ -59,12 +59,20 @@ L. Dixon and D. G. Grier, "Flow visualization and flow cytometry with
 holographic video microscopy," _Optics Express_ **17**
 13071-13079 (2009).
 
-3. C. F. Bohren and D. R. Huffman, Absorption and Scattering of Light
+3. F. C. Cheong, B. J. Krishnatreya and D. G. Grier,
+"Strategies for three-dimensional particle tracking with
+holographic video microscopy,"
+_Optics Express_ **18**, 13563-13573 (2010).
+
+4. C. F. Bohren and D. R. Huffman, Absorption and Scattering of Light
 by Small Particles (New York, Wiley 1983).
 
-4. W. Yang, "Improved recurstive algorithm for light scattering
+5. H. Moyses, B. J. Krishnatreya and D. G. Grier,
+_Optics Express_ **21** 5968-5973 (2013).
+
+6. W. Yang, "Improved recurstive algorithm for light scattering
 by a multilayered sphere," _Applied Optics_ **42**, 1710--1720 (2003).
 
-5. O. Pena and U. Pal, "Scattering of electromagnetic radiation
+7. O. Pena and U. Pal, "Scattering of electromagnetic radiation
 by a multilayered sphere," _Computer Physics Communications_
 **180**, 2348-2354 (2009).
