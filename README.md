@@ -64,11 +64,11 @@ holographic video microscopy," _Optics Express_ **17**
 holographic video microscopy,"
 _Optics Express_ **18**, 13563-13573 (2010).
 
-4. C. F. Bohren and D. R. Huffman, Absorption and Scattering of Light
-by Small Particles (New York, Wiley 1983).
-
-5. H. Moyses, B. J. Krishnatreya and D. G. Grier,
+4. H. Moyses, B. J. Krishnatreya and D. G. Grier,
 _Optics Express_ **21** 5968-5973 (2013).
+
+5. C. F. Bohren and D. R. Huffman, Absorption and Scattering of Light
+by Small Particles (New York, Wiley 1983).
 
 6. W. Yang, "Improved recurstive algorithm for light scattering
 by a multilayered sphere," _Applied Optics_ **42**, 1710--1720 (2003).
