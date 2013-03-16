@@ -45,3 +45,26 @@ gpu_sphericalfield to compute the field scattered by a stratified sphere.
 * **lmsphere/**: Computes normalized holograms of spheres based on the
 field computed by spherefield.  Also fits experimentally measured
 holograms of colloidal spheres to the predictions of Lorenz-Mie theory.
+
+## References
+
+1. S.-H. Lee, Y. Roichman, G.-R. Yi, S.-H. Kim, S.-M. Yang,
+A. van Blaaderen, P. van Oostrum and D. G. Grier,
+"Characterizing and tracking single colloidal particles with video
+holographic microscopy," 
+_Optics Express_ **15**, 18275-18282 (2007).
+
+2. F. C. Cheong, B. Sun, R. Dreyfus, J. Amato-Grill, K. Xiao,
+L. Dixon and D. G. Grier, "Flow visualization and flow cytometry with
+holographic video microscopy," _Optics Express_ **17**
+13071-13079 (2009).
+
+3. C. F. Bohren and D. R. Huffman, Absorption and Scattering of Light
+by Small Particles (New York, Wiley 1983).
+
+4. W. Yang, "Improved recurstive algorithm for light scattering
+by a multilayered sphere," _Applied Optics_ **42**, 1710--1720 (2003).
+
+5. O. Pena and U. Pal, "Scattering of electromagnetic radiation
+by a multilayered sphere," _Computer Physics Communications_
+**180**, 2348-2354 (2009).
