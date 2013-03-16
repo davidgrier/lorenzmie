@@ -30,3 +30,13 @@ properties are defined by Lorenz-Mie scattering coefficients.
 
 * gpu_sphericalfield: A hardware-accelerated implementation of
 sphericalfield based on the GPUlib library of IDL bindings to CUDA.   
+
+* sphere_coefficients: Calculates the Lorenz-Mie scattering
+coefficients for a multilayered sphere of radius ap and refractive
+index np immersed in a medium of refractive index nm at vacuum
+wavelength lambda.  These coefficients then can be used in
+sphericalfield to compute the field scattered by a stratified sphere.
+
+* spherefield: Uses sphere_coefficients and either sphericalfield or
+gpu_sphericalfield to compute the field scattered by a stratified sphere.
+
