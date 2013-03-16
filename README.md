@@ -4,7 +4,7 @@
 using the Lorenz-Mie theory of light scattering.**
 
 IDL is the Interactive Data Language, and is a product of
-[Exelis Visual Information Solutions](www.exelisvis.com)
+[Exelis Visual Information Solutions](http://www.exelisvis.com)
 
 lorenzmie is licensed under the GPLv3.
 
@@ -29,9 +29,9 @@ specialized:
 properties are defined by Lorenz-Mie scattering coefficients.
 
 * **gpu_sphericalfield**: A hardware-accelerated implementation of
-sphericalfield based on the [GPULib](www.txcorp.com/home/gpulib)
+sphericalfield based on the [GPULib](http://www.txcorp.com/home/gpulib)
 library of IDL bindings to
-[CUDA](www.nvidia.com/object/cuda-parallel-computing-platform.html).
+[CUDA](http://www.nvidia.com/object/cuda-parallel-computing-platform.html).
 
 * **sphere_coefficients**: Calculates the Lorenz-Mie scattering
 coefficients for a multilayered sphere of radius ap and refractive
