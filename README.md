@@ -46,7 +46,7 @@ gpu_sphericalfield to compute the field scattered by a stratified sphere.
 field computed by spherefield.  Also fits experimentally measured
 holograms of colloidal spheres to the predictions of Lorenz-Mie theory.
 
-## References
+### References
 
 1. S.-H. Lee, Y. Roichman, G.-R. Yi, S.-H. Kim, S.-M. Yang,
 A. van Blaaderen, P. van Oostrum and D. G. Grier,
