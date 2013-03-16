@@ -42,3 +42,6 @@ sphericalfield to compute the field scattered by a stratified sphere.
 * **spherefield**: Uses sphere_coefficients and either sphericalfield or
 gpu_sphericalfield to compute the field scattered by a stratified sphere.
 
+* **lmsphere/**: Computes normalized holograms of spheres based on the
+field computed by spherefield.  Also fits experimentally measured
+holograms of colloidal spheres to the predictions of Lorenz-Mie theory.
