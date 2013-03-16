@@ -8,8 +8,6 @@ IDL is the Interactive Data Language, and is a product of
 
 lorenzmie is licensed under the GPLv3.
 
-- - -
-
 ## What it does
 
 lorenzmie is intended for computing and analyzing holographic images
@@ -26,19 +24,19 @@ isotropic and homogeneous.
 The code is organized from the most general components to the most
 specialized:
 
-* *sphericalfield*: Calculates the complex electric field at a displacement
+* **sphericalfield**: Calculates the complex electric field at a displacement
 (x,y,z) relative to the center of an illuminated object whose scattering
 properties are defined by Lorenz-Mie scattering coefficients.
 
-* *gpu_sphericalfield*: A hardware-accelerated implementation of
+* **gpu_sphericalfield**: A hardware-accelerated implementation of
 sphericalfield based on the GPUlib library of IDL bindings to CUDA.   
 
-* *sphere_coefficients*: Calculates the Lorenz-Mie scattering
+* **sphere_coefficients**: Calculates the Lorenz-Mie scattering
 coefficients for a multilayered sphere of radius ap and refractive
 index np immersed in a medium of refractive index nm at vacuum
 wavelength lambda.  These coefficients then can be used in
 sphericalfield to compute the field scattered by a stratified sphere.
 
-* *spherefield*: Uses sphere_coefficients and either sphericalfield or
+* **spherefield**: Uses sphere_coefficients and either sphericalfield or
 gpu_sphericalfield to compute the field scattered by a stratified sphere.
 
