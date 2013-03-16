@@ -1,7 +1,7 @@
 # lmsphere
 
-** IDL routines for modeling and fitting holographic
-video microscopy images of colloidal spheres **
+**IDL routines for modeling and fitting holographic
+video microscopy images of colloidal spheres**
 
 This is a component of **lorenzmie**.
 
