@@ -29,7 +29,9 @@ specialized:
 properties are defined by Lorenz-Mie scattering coefficients.
 
 * **gpu_sphericalfield**: A hardware-accelerated implementation of
-sphericalfield based on the GPUlib library of IDL bindings to CUDA.   
+sphericalfield based on the [GPULib](www.txcorp.com/home/gpulib)
+library of IDL bindings to
+[CUDA](www.nvidia.com/object/cuda-parallel-computing-platform.html).
 
 * **sphere_coefficients**: Calculates the Lorenz-Mie scattering
 coefficients for a multilayered sphere of radius ap and refractive
