@@ -76,3 +76,7 @@ by a multilayered sphere," _Applied Optics_ **42**, 1710--1720 (2003).
 7. O. Pena and U. Pal, "Scattering of electromagnetic radiation
 by a multilayered sphere," _Computer Physics Communications_
 **180**, 2348-2354 (2009).
+
+8. P. Messmer, P. J. Mullowney and B. E. Granger, 
+"GPULib: GPU computing in high-level languages," 
+_Computer Science and Engineering_ **10**, 70-73 (2008)
