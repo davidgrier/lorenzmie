@@ -86,6 +86,7 @@
 ; 06/18/2010 DGG Added COMPILE_OPT.
 ; 09/04/2011 DGG Compute -\tau_n rather than \tau_n
 ; 01/13/2013 DGG Documentation fixes and formatting.
+; 03/17/2013 DGG Small algebraic rearrangements for computational efficiency.
 ;
 ; Copyright (c) 2007-2013 Bo Sun and David G. Grier
 ;-
@@ -162,13 +163,13 @@ for n = 1.d, nc do begin
     En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
 
 ; the scattered field in spherical coordinates (4.45)
-    Es += En * (ci * ab[0,n] * Ne1n - ab[1,n] * Mo1n)
+    Es += (En * ci * ab[0,n]) * Ne1n - (En * ab[1,n]) * Mo1n
 
 ; upward recurrences ...
 ; ... angular functions (4.47)
 ; Method described by Wiscombe (1980)
     pi_nm1 = pi_n
-    pi_n = swisc + (n + 1.d) * twisc / n
+    pi_n = swisc + ((n + 1.d) / n) * twisc
 
 ; ... Riccati-Bessel function
     xi_nm2 = xi_nm1
