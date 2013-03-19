@@ -263,7 +263,7 @@ fixdelta = keyword_set(fixdelta)
 gpu = keyword_set(gpu)
 doreport = ~keyword_set(quiet)
 dographics = arg_present(graphics) || keyword_set(graphics)
-debug = keyword_set(debug)
+quiet = ~keyword_set(debug)
 
 ;;; Find candidate features
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
@@ -316,7 +316,7 @@ refit:
       ;; Estimate axial position as position of peak brightness in the
       ;; Rayleigh-Sommerfeld reconstruction: zp
       z = dindgen(50) * 4.d + 10.d ; FIXME: set range more intelligently
-      res = rs1d(ac, z, rc, lambda = lambda/nm0, mpp = mpp)
+      res = rs1d(ac, z, rc, lambda/nm0, mpp)
       m = max(abs(res), loc)
       zp = z[loc]                       ; axial position [pixels]
       ;; Estimate radius using model
@@ -337,18 +337,18 @@ refit:
    p0 = [zp, ap, real_part(np0), imaginary(np0), $
          real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
 
-   if debug then lmf_report, 'starting estimates:', [rp0, p0]
+   if ~quiet then lmf_report, 'starting estimates:', [rp0, p0]
 
    ;; Improve estimates by fitting to radial profile
    p1 = fitlmsphere1d(aa+1., p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
    if ~finite(thischisq) then begin
-      if debug then message, 'parameter estimate failed -- trying again with fixed delta', /inf
+      message, 'parameter estimate failed -- trying again with fixed delta', /inf, noprint = quiet
       p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
    endif else begin
       ;; Some fits fail with alpha = 2.0; have to fixdelta.
       peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
       if peggedalpha then begin
-         if debug then message, 'estimate for alpha exceeds bounds -- trying again with fixed delta', /inf
+         message, 'alpha exceeds bounds -- trying again with fixed delta', /inf, noprint = quiet
          p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
       endif
    endelse
@@ -357,8 +357,8 @@ refit:
       continue
    endif
    
-   if debug then lmf_report, 'improved estimates: ' + string(thischisq), $
-                             [rp0, reform(p1[0, *])]
+   if ~quiet then lmf_report, 'improved estimates: ' + string(thischisq), $
+                              [rp0, reform(p1[0, *])]
 
    if dographics then begin
       rp[0:1,ndx] = rp0
@@ -374,7 +374,7 @@ refit:
                              fixdelta = fixdelta || peggedalpha, $
                              deinterlace = keyword_set(deinterlace) ? deinterlace + roi[1] : 0, $
                              object = gpu, $
-                             quiet = ~debug)
+                             quiet = quiet)
    if n_elements(thisfeature) eq 1 then begin ; fit failed
       message, 'fit failed -- skipping this feature', /inf
       continue
