@@ -152,6 +152,7 @@
 ;    image rather than center.  Correctly ignore deinterlace = 0.
 ; 02/24/2013 DGG sample ERR when deinterlacing.
 ; 03/13/2013 DGG correct deinterlace code for object fitting.
+; 03/22/2013 DGG rebin(/sample) is more efficient.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -368,8 +369,8 @@ if keyword_set(object) then begin
 endif else begin
    x = dindgen(nx)
    y = dindgen(1, ny)
-   x = rebin(x, nx, ny)
-   y = rebin(y, nx, ny)
+   x = rebin(x, nx, ny, /sample)
+   y = rebin(y, nx, ny, /sample)
 
    aa = double(reform(a, npts))
 

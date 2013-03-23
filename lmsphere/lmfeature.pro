@@ -124,6 +124,7 @@
 ; 03/12/2013 DGG Replace LMF_RANGE with LMF_CROP, which also
 ;   calculates statistical weights. Incorporated LMF_REPORT, LMF_CROP.
 ;   Refit if initial (x,y) estimate is too far off the mark.
+; 03/22/2013 DGG rebin(/sample) is more efficient.
 ;
 ; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
 ;-
@@ -189,8 +190,8 @@ snr = abs(aa[r])/as[r]                         ; signal-to-noise ratio
 ;ratio at extrema
 nx = x1 - x0 + 1
 ny = y1 - y0 + 1
-xsq = rebin((findgen(nx)    + x0 - rc[0])^2, nx, ny)
-ysq = rebin((findgen(1, ny) + y0 - rc[1])^2, nx, ny)
+xsq = rebin((findgen(nx)    + x0 - rc[0])^2, nx, ny, /sample)
+ysq = rebin((findgen(1, ny) + y0 - rc[1])^2, nx, ny, /sample)
 err = reform(interpol(snr, r, sqrt(xsq + ysq), /spline), nx, ny) > min(snr)
 end
 

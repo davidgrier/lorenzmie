@@ -85,6 +85,7 @@
 ;    coordinates and eliminates off-by-one and off-by-half errors.
 ; 03/06/2013 DGG Implementation of stratified spheres.  Added FIELD
 ;    keyword.
+; 03/22/2013 DGG rebin(/sample) is more efficient.
 ;
 ; Copyright (c) 2007-2013 David G. Grier
 ;-
@@ -167,8 +168,8 @@ ny = float(dim[1])
 npts = nx * ny
 x = findgen(nx) - float(rp[0])
 y = findgen(1, ny) - float(rp[1])
-x = rebin(x, nx, ny)
-y = rebin(y, nx, ny)
+x = rebin(x, nx, ny, /sample)
+y = rebin(y, nx, ny, /sample)
 
 zp = float(rp[2])
 
