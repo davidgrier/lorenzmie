@@ -399,6 +399,7 @@ refit:
       pf.putdata, rp[0,*], rp[1,*]
    endif
 
+   thisfeature = [[thisfeature], [thischisq, n_elements(aa)]]
    features.add, thisfeature
 endfor
 
