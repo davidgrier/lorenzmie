@@ -102,6 +102,7 @@
 ; 10/13/2012 DGG Added DELTA property.  Renamed to DGGdhmLMSphere
 ; 03/13/2013 DGG origin of coordinate system is moved to lower-left
 ;    corner, rather than center.
+; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier releases.
 ;
 ; NOTES:
 ; Implement CPU calculations for systems without GPULib.
@@ -175,11 +176,13 @@ gpu.kr  = gpumult(gpu.y, gpu.y, LHS = gpu.kr)
 gpu.rho = gpuadd(gpu.rho, gpu.kr, LHS = gpu.rho)
 
 ; r = sqrt(rho^2 + z^2)
-;;; NOTE: the 5-parameter form of gpusqrt incorrectly yields NAN for
-; some input values on some GPUs, whereas the 1-parameter form works properly.
-; gpu.kr = gpusqrt(1.d, 1.d, gpu.rho, self.rp[2]^2, 0.d, LHS = gpu.kr)
-gpu.kr = gpuadd(1.d, gpu.rho, 0.d, gpu.rho, self.rp[2]^2, LHS = gpu.kr)
-gpu.kr = gpusqrt(gpu.kr, LHS = gpu.kr, /NONBLOCKING)
+gpu.kr = gpusqrt(1.d, 1.d, gpu.rho, self.rp[2]^2, 0.d, LHS = gpu.kr)
+;;; NOTE: Under GPULib 1.4.4, the 5-parameter form of gpusqrt
+; incorrectly yields NAN for some input values on some GPUs, whereas
+; the 1-parameter form works properly.  This seems to be fixed under
+; GPULib 1.6.0.
+; gpu.kr = gpuadd(1.d, gpu.rho, 0.d, gpu.rho, self.rp[2]^2, LHS = gpu.kr)
+; gpu.kr = gpusqrt(gpu.kr, LHS = gpu.kr, /NONBLOCKING)
 gpu.rho = gpusqrt(gpu.rho, LHS = gpu.rho)
 
 ; polar angle
@@ -189,18 +192,12 @@ gpu.costheta = gpudiv(gpu.z,   gpu.kr, LHS = gpu.costheta, /NONBLOCKING)
 ; azimuthal angle
 gpu.sinphi = gpudiv(gpu.y, gpu.rho, LHS = gpu.sinphi, /NONBLOCKING)
 gpu.cosphi = gpudiv(gpu.x, gpu.rho, LHS = gpu.cosphi, /NONBLOCKING)
-;;; NOTE: this results in a divide-by-zero error when x = y = 0.
-; The following hack fixes the problem under the constraint
-; that gpu array subscripting does not yet work.
-if ((abs(xc) + abs(yc)) mod 1.) lt 1e-3 then begin
-   ; don't do anything if the center is outside the array
+;;; correct divide-by-zero errors when rho is small
+if ((abs(xc) + abs(yc)) mod 1.) lt 1e-3 then begin ; center falls on pixel center
+   ;; don't do anything if the center is outside the array
    if (xc ge 0 and xc lt nx and yc ge 0 and yc lt ny) then begin
-      temp = gpugetarr(gpu.sinphi)
-      temp[xc,yc] = 0.
-      gpu.sinphi = gpuputarr(temp, LHS = gpu.sinphi)
-      temp = gpugetarr(gpu.cosphi, LHS = temp)
-      temp[xc,yc] = 1.
-      gpu.cosphi = gpuputarr(temp, LHS = gpu.cosphi)
+      (gpu.sinphi)[xc, yc] = 0.
+      (gpu.cosphi)[xc, yc] = 1.
    endif
 endif
 
