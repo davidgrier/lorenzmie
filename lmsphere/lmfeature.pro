@@ -125,8 +125,10 @@
 ;   calculates statistical weights. Incorporated LMF_REPORT, LMF_CROP.
 ;   Refit if initial (x,y) estimate is too far off the mark.
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
+; 05/06/2013 DGG and David Ruffner: Faster and more accurate estimate
+;   of zp using spherical-wave model rather than back propagation.
 ;
-; Copyright (c) 2008-2013 David G. Grier and Fook Chiong Cheong
+; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
 ;;;;;
 ;
@@ -306,28 +308,27 @@ refit:
       proi = plot(poly, over = graphics, linestyle = '--', color = 'light green')
    endif
 
-   ;; Use radial profile to estimate parameters
+   ;; Use radial profile to estimate axial position, zp,
+   ;; David Ruffner's method based on spherical wave model.
+   rho = findgen(n_elements(aa)) + 0.5
+   lap = deriv(aa)
+   lap = deriv(lap) + lap/rho
+   w = where(abs(aa) gt 1e-2)
+   qsq = -lap[w]/aa[w]
+   zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
+   sigmatrim, zsq, mzsq
+   zp = sqrt(mzsq)              ; estimated axial position [pixel]
+
    ;; Model observed interference pattern as Poisson's spot to
-   ;; relate axial position, zp, and sphere radius, ap
-   c = fix(aa ge 0.)
-   z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; FIXME: zero crossings
-   j0n = [2.4048, 5.5201, 8.6537]               ; zeros of J0(x)
-   fac = 2.*k*mean(z0/j0n) - 1.
+   ;; obtain radius, ap, from axial position, zp
    if doap then begin
-      ;; Estimate axial position as position of peak brightness in the
-      ;; Rayleigh-Sommerfeld reconstruction: zp
-      z = dindgen(50) * 4.d + 10.d ; FIXME: set range more intelligently
-      res = rs1d(ac, z, rc, lambda/nm0, mpp)
-      m = max(abs(res), loc)
-      zp = z[loc]                       ; axial position [pixels]
-      ;; Estimate radius using model
-      ap = zp /fac ; estimated radius [um]
-   endif else begin
-      ;; Use provided radius
+      c = fix(aa ge 0.)
+      z0 = float(where(abs(c - c[1:*]) gt 0)) + 1. ; FIXME: zero crossings
+      j0n = [2.4048, 5.5201, 8.6537]               ; zeros of J0(x)
+      fac = 2.*k*mean(z0/j0n) - 1.
+      ap = zp /fac              ; estimated radius [um]
+   endif else $
       ap = ap0
-      ;; Estimate axial position using model
-      zp = ap * fac
-   endelse
 
    ;; Estimate np: FIXME: currently uses input value: np0
 
@@ -367,7 +368,7 @@ refit:
    endif
 
    ;; 2D fit to refine estimates
-   p2 = [rc, reform(p1[0, *])] ; initial parameters from 1D fit
+   p2 = [rc, reform(p1[0, *])]  ; initial parameters from 1D fit
    thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
                              weight = weight, $
                              chisq = thischisq, $
