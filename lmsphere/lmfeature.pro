@@ -127,6 +127,7 @@
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
 ; 05/06/2013 DGG and David Ruffner: Faster and more accurate estimate
 ;   of zp using spherical-wave model rather than back propagation.
+; 05/13/2013 DGG Fix 'odd'/'even' reporting for deinterlaced images.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -167,16 +168,18 @@ pro lmf_crop, a, rc, aa, roi, ac, weight, deinterlace = deinterlace
 COMPILE_OPT IDL2, HIDDEN
 
 sz = size(a, /dimensions)
+maxx = sz[0]-1
+maxy = sz[1]-1
 
 as = azistd(a, aa, center = rc, deinterlace = deinterlace) ; azimuthal standard deviation
 aa -= 1.                                                   ; azimuthal average
 
 ;;; region of interest
 range = max(where(abs(aa) ge as)) > 30 ; estimate for range of useful signal
-x0 = round(rc[0] - range) > 0 < (sz[0]-1)
-x1 = (x0 + 2*range + 1) > 0 < (sz[0]-1)
-y0 = round(rc[1] - range) > 0 < (sz[1]-1)
-y1 = (y0 + 2*range + 1) > 0 < (sz[1]-1)
+x0 = round(rc[0] - range) > 0 < maxx
+x1 = (x0 + 2*range + 1) > 0 < maxx
+y0 = round(rc[1] - range) > 0 < maxy
+y1 = (y0 + 2*range + 1) > 0 < maxy
 roi = [[x0, y0], [x1, y1]]      ; corners of ROI
 
 ;;; cropped image
@@ -276,7 +279,7 @@ if doreport then begin
    print
    message, 'noise: ' + strtrim(noise, 2), /inf
    if keyword_set(deinterlace) then $
-      message, 'analyzing ' + ((deinterlace mod 2) ? 'even' : 'odd') + ' field', /inf
+      message, 'analyzing ' + ((deinterlace mod 2) ? 'odd' : 'even') + ' field', /inf
    message, 'features found: ' + strtrim(count, 2), /inf
 endif
 
