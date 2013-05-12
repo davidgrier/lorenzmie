@@ -127,7 +127,8 @@
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
 ; 05/06/2013 DGG and David Ruffner: Faster and more accurate estimate
 ;   of zp using spherical-wave model rather than back propagation.
-; 05/13/2013 DGG Fix 'odd'/'even' reporting for deinterlaced images.
+; 05/13/2013 DGG Fixed 'odd'/'even' reporting for deinterlaced images.
+;   Fixed cropping bug.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -177,9 +178,9 @@ aa -= 1.                                                   ; azimuthal average
 ;;; region of interest
 range = max(where(abs(aa) ge as)) > 30 ; estimate for range of useful signal
 x0 = round(rc[0] - range) > 0 < maxx
-x1 = (x0 + 2*range + 1) > 0 < maxx
+x1 = round(rc[0] + range) > 0 < maxx
 y0 = round(rc[1] - range) > 0 < maxy
-y1 = (y0 + 2*range + 1) > 0 < maxy
+y1 = round(rc[1] + range) > 0 < maxy
 roi = [[x0, y0], [x1, y1]]      ; corners of ROI
 
 ;;; cropped image
