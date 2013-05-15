@@ -129,6 +129,7 @@
 ;   of zp using spherical-wave model rather than back propagation.
 ; 05/13/2013 DGG Fixed 'odd'/'even' reporting for deinterlaced images.
 ;   Fixed cropping bug.
+; 05/15/2013 DGG Actually use computed weightin in fit.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -171,16 +172,18 @@ COMPILE_OPT IDL2, HIDDEN
 sz = size(a, /dimensions)
 maxx = sz[0]-1
 maxy = sz[1]-1
+xc = rc[0]
+yc = rc[1]
 
 as = azistd(a, aa, center = rc, deinterlace = deinterlace) ; azimuthal standard deviation
 aa -= 1.                                                   ; azimuthal average
 
 ;;; region of interest
 range = max(where(abs(aa) ge as)) > 30 ; estimate for range of useful signal
-x0 = round(rc[0] - range) > 0 < maxx
-x1 = round(rc[0] + range) > 0 < maxx
-y0 = round(rc[1] - range) > 0 < maxy
-y1 = round(rc[1] + range) > 0 < maxy
+x0 = round(xc - range) > 0 < maxx
+x1 = round(xc + range) > 0 < maxx
+y0 = round(yc - range) > 0 < maxy
+y1 = round(yc + range) > 0 < maxy
 roi = [[x0, y0], [x1, y1]]      ; corners of ROI
 
 ;;; cropped image
@@ -196,9 +199,9 @@ snr = abs(aa[r])/as[r]                         ; signal-to-noise ratio
 ;ratio at extrema
 nx = x1 - x0 + 1
 ny = y1 - y0 + 1
-xsq = rebin((findgen(nx)    + x0 - rc[0])^2, nx, ny, /sample)
-ysq = rebin((findgen(1, ny) + y0 - rc[1])^2, nx, ny, /sample)
-err = reform(interpol(snr, r, sqrt(xsq + ysq), /spline), nx, ny) > min(snr)
+xsq = rebin((findgen(nx)    + x0 - xc)^2, nx, ny, /sample)
+ysq = rebin((findgen(1, ny) + y0 - yc)^2, nx, ny, /sample)
+weight = reform(interpol(snr, r, sqrt(xsq + ysq), /spline), nx, ny) > min(snr)
 end
 
 ;;;;;
