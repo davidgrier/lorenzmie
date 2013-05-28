@@ -214,7 +214,9 @@ function lmfeature, a, lambda, mpp, $
                     noise = noise, $
                     pickn = pickn, $
                     ap = ap0, $
+                    fixap = fixap, $
                     np = np0, $
+                    fixnp = fixnp, $
                     nm = nm0, $
                     fixalpha = fixalpha, $
                     fixdelta = fixdelta, $
@@ -349,16 +351,22 @@ refit:
    if ~quiet then lmf_report, 'starting estimates:', [rp0, p0]
 
    ;; Improve estimates by fitting to radial profile
-   p1 = fitlmsphere1d(aa+1., p0, lambda, mpp, fixdelta = fixdelta, chisq = thischisq, /quiet)
+   p1 = fitlmsphere1d(aa+1., p0, lambda, mpp, $
+                      fixap = fixap, fixnp = fixnp, fixdelta = fixdelta, $
+                      chisq = thischisq, /quiet)
    if ~finite(thischisq) then begin
       message, 'parameter estimate failed -- trying again with fixed delta', /inf, noprint = quiet
-      p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
+      p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, $
+                         fixap = fixap, fixnp = fixnp, /fixdelta, $
+                         chisq = thischisq, /quiet)
    endif else begin
       ;; Some fits fail with alpha = 2.0; have to fixdelta.
       peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
       if peggedalpha then begin
          message, 'alpha exceeds bounds -- trying again with fixed delta', /inf, noprint = quiet
-         p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, /fixdelta, chisq = thischisq, /quiet)
+         p1 = fitlmsphere1d(aa+1, p0, lambda, mpp, $
+                            fixap = fixap, fixnp = fixnp, /fixdelta, $
+                            chisq = thischisq, /quiet)
       endif
    endelse
    if ~finite(thischisq) then begin
@@ -379,6 +387,8 @@ refit:
    thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
                              weight = weight, $
                              chisq = thischisq, $
+                             fixap = fixap, $
+                             fixnp = fixnp, $
                              fixalpha = fixalpha, $
                              fixdelta = fixdelta || peggedalpha, $
                              deinterlace = keyword_set(deinterlace) ? deinterlace + roi[1] : 0, $

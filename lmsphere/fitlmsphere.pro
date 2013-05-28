@@ -74,6 +74,8 @@
 ; KEYWORD OUTPUTS:
 ;    chisq: Chi-squared value of a (successful) fit.
 ;
+;    residuals: Residuals from the fit.
+;
 ; OUTPUTS:
 ;    params: Least-squares fits for the values estimated in P.
 ;      params[0,*]: Fit values.
@@ -153,6 +155,7 @@
 ; 02/24/2013 DGG sample ERR when deinterlacing.
 ; 03/13/2013 DGG correct deinterlace code for object fitting.
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
+; 05/28/2013 DGG return residuals from fit.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -219,24 +222,25 @@ field[0, *] += 1.                        ; \hat{x}
 return, total(real_part(field * conj(field)), 1)
 end
 
-function fitlmsphere, a, $                    ; image
-                      p0, $                   ; starting estimates for parameters
-                      lambda, $               ; wavelength of light [micrometers]
-                      mpp, $                  ; micrometers per pixel
-                      weight = weight, $      ; estimate for weighting at each pixel
-                      chisq = chisq, $        ; chi-squared value of fit
-                      aplimits = aplimits, $  ; limits on ap [micrometers]
-                      nplimits = nplimits, $  ; limits on np
-                      fixnp = fixnp, $        ; fix particle refractive index
-                      fixkp = fixkp, $        ; fix particle extinction coefficient
-                      fixnm = fixnm, $        ; fix medium refractive index
-                      fixkm = fixkm, $        ; fix medium extinction coefficient
-                      fixap = fixap, $        ; fix particle radius
-                      fixzp = fixzp, $        ; fix particle axial position
-                      fixalpha = fixalpha, $  ; fix illumination amplitude
-                      fixdelta = fixdelta, $  ; fix wavefront distortion
-                      deinterlace = deinterlace, $
+function fitlmsphere, a, $                     ; image
+                      p0, $                    ; starting estimates for parameters
+                      lambda, $                ; wavelength of light [micrometers]
+                      mpp, $                   ; micrometers per pixel
+                      weights = weights, $     ; estimate for weighting at each pixel
                       precision = precision, $ ; precision of convergence
+                      chisq = chisq, $         ; chi-squared value of fit
+                      residuals = residuals, $ ; residuals from fit
+                      aplimits = aplimits, $   ; limits on ap [micrometers]
+                      nplimits = nplimits, $   ; limits on np
+                      fixnp = fixnp, $         ; fix particle refractive index
+                      fixkp = fixkp, $         ; fix particle extinction coefficient
+                      fixnm = fixnm, $         ; fix medium refractive index
+                      fixkm = fixkm, $         ; fix medium extinction coefficient
+                      fixap = fixap, $         ; fix particle radius
+                      fixzp = fixzp, $         ; fix particle axial position
+                      fixalpha = fixalpha, $   ; fix illumination amplitude
+                      fixdelta = fixdelta, $   ; fix wavefront distortion
+                      deinterlace = deinterlace, $
                       gpu = gpu, $             ; use GPU acceleration
                       object = object, $       ; use DGGdhmSphereDHM object
                       quiet = quiet            ; don't print diagnostics
@@ -280,8 +284,9 @@ nx = sz[0]
 ny = sz[1]
 npts = nx*ny
 
-if n_elements(err) ne npts then $
-   err = replicate(1., npts)    ; FIXME: estimate for pixel noise
+err = 0                         ; use WEIGHTS in favor of ERR for MPFIT
+if n_elements(weights) ne npts then $
+   weights = replicate(1., npts)
 
 ;;; Constraints on fitting parameters
 nparams = n_elements(p0)
@@ -354,18 +359,19 @@ if keyword_set(object) then begin
    endif
 
    aa = double(a)
-   err = reform(err, nx, ny)
+   weights = reform(weights, nx, ny)
    if keyword_set(deinterlace) then begin
       w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
-      err = err[*, w]
       aa = aa[*, w]
+      weights = weights[*, w]
    endif
       
    p = mpfitfun('lmsphere_objf', obj, aa, err, p0, $
+                weights = weights, ftol = precision, $
                 parinfo = parinfo, /fastnorm, $
                 perror = perror, bestnorm = chisq, dof = dof, $
                 status = status, errmsg = errmsg, quiet = quiet, $
-                ftol = precision)
+                best_resid = residuals)
 endif else begin
    x = dindgen(nx)
    y = dindgen(1, ny)
@@ -380,6 +386,7 @@ endif else begin
       y = y[w]
       aa = aa[w]
       err = err[w]
+      weights = weights[w]
    endif
 
 ; parameters passed to the fitting function
@@ -387,11 +394,11 @@ endif else begin
 
 ; perform fit
    p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
-                  weights = err, $
+                  weights = weights, ftol = precision, $
                   parinfo = parinfo, /fastnorm, $
                   perror = perror, bestnorm = chisq, dof = dof, $
                   status = status, errmsg = errmsg, quiet = quiet, $
-                  ftol = precision)
+                  best_resid = residuals)
 
 endelse
 
