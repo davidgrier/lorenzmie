@@ -158,7 +158,7 @@
 ; 03/13/2013 DGG correct deinterlace code for object fitting.
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
 ; 05/28/2013 DGG optionally return residuals from fit.
-; 05/29/2013 DGG optionally return fit itself
+; 05/29/2013 DGG optionally return fit itself.  Honor FIXNP flag.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -318,6 +318,7 @@ parinfo[4].limited = 1
 parinfo[4].limits = [1.001d*p0[6], 3.d] ; FIXME what about low-index particles?
 if n_elements(nplimits) eq 2 then $
    parinfo[4].limits = nplimits
+parinfo[4].fixed = keyword_set(fixnp)
 ; kp: Extinction coefficient of particle
 parinfo[5].limited = 1
 parinfo[5].limits = [0.d, 10.d]
