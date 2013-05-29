@@ -74,7 +74,9 @@
 ; KEYWORD OUTPUTS:
 ;    chisq: Chi-squared value of a (successful) fit.
 ;
-;    residuals: Residuals from the fit.
+;    yfit:  Fit obtained from best parameters
+;
+;    residuals: Residuals from the best fit.
 ;
 ; OUTPUTS:
 ;    params: Least-squares fits for the values estimated in P.
@@ -155,7 +157,8 @@
 ; 02/24/2013 DGG sample ERR when deinterlacing.
 ; 03/13/2013 DGG correct deinterlace code for object fitting.
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
-; 05/28/2013 DGG return residuals from fit.
+; 05/28/2013 DGG optionally return residuals from fit.
+; 05/29/2013 DGG optionally return fit itself
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -229,6 +232,7 @@ function fitlmsphere, a, $                     ; image
                       weights = weights, $     ; estimate for weighting at each pixel
                       precision = precision, $ ; precision of convergence
                       chisq = chisq, $         ; chi-squared value of fit
+                      yfit = yfit, $           ; best fit to data
                       residuals = residuals, $ ; residuals from fit
                       aplimits = aplimits, $   ; limits on ap [micrometers]
                       nplimits = nplimits, $   ; limits on np
@@ -371,7 +375,8 @@ if keyword_set(object) then begin
                 parinfo = parinfo, /fastnorm, $
                 perror = perror, bestnorm = chisq, dof = dof, $
                 status = status, errmsg = errmsg, quiet = quiet, $
-                best_resid = residuals)
+                yfit = yfit, best_resid = residuals)
+   residuals = reform(residuals, nx, n_elements(residuals)/nx)
 endif else begin
    x = dindgen(nx)
    y = dindgen(1, ny)
@@ -389,17 +394,16 @@ endif else begin
       weights = weights[w]
    endif
 
-; parameters passed to the fitting function
+   ;; parameters passed to the fitting function
    argv = {lambda:lambda, mpp:mpp, precision:precision, gpu:gpu}
 
-; perform fit
+   ;; perform fit
    p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
                   weights = weights, ftol = precision, $
                   parinfo = parinfo, /fastnorm, $
                   perror = perror, bestnorm = chisq, dof = dof, $
                   status = status, errmsg = errmsg, quiet = quiet, $
-                  best_resid = residuals)
-
+                  yfit = yfit, best_resid = residuals)
 endelse
 
 if status le 0 then begin 
