@@ -364,8 +364,8 @@ if keyword_set(object) then begin
    endif
 
    aa = double(a)
-   weights = reform(weights, nx, ny)
    if keyword_set(deinterlace) then begin
+      weights = reform(weights, nx, ny)
       w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
       aa = aa[*, w]
       weights = weights[*, w]
@@ -391,7 +391,6 @@ endif else begin
       x = x[w]
       y = y[w]
       aa = aa[w]
-      err = err[w]
       weights = weights[w]
    endif
 
