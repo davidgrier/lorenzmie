@@ -144,7 +144,8 @@
 ;   Use fringes to set range for fits.
 ; 06/02/2013 DGG Use deviates from azimuthal average to compute
 ;   weightings for fits.  Added NFRINGES and MAXREFITS keywords.
-; 06/04/2013 DGG Added COUNT keyword.
+; 06/04/2013 DGG Added COUNT keyword.  Estiamte per-pixel errors for
+;   two-dimensional fit.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -310,11 +311,11 @@ refit:
 
    ;;; cropped image
    ac = a[x0:x1, y0:y1]
-   dev = dev[x0:x1, y0:y1] > noise
+   dev = dev[x0:x1, y0:y1]
    aa = aa[0:range]
 
    ;;; significance estimate within ROI
-   weights = 1./(dev*dev)
+   err = abs(dev)/noise > 1.
 
    ;; Use radial profile to estimate axial position, zp,
    ;; David Ruffner's method based on spherical wave model.
@@ -389,7 +390,8 @@ refit:
    ;; 2D fit to refine estimates
    p2 = [rc-r0, reform(p1[0, *])]  ; initial parameters from 1D fit
 
-   thisfeature = fitlmsphere(ac, p2, lambda, mpp, $ ; weight = weight, $
+   thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
+                             errors = err, $
                              chisq = thischisq, $
                              residuals = residuals, $
                              fixap = fixap, $

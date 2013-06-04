@@ -39,6 +39,11 @@
 ;    mpp: Length-scale calibration factor [micrometers/pixel].
 ;
 ; KEYWORD INPUTS:
+;    errors: Estimate for error at each pixel.  Either an array with
+;      the same dimensions as A, or a single digit for an overall
+;      error estimate.
+;      Default: 1.D
+;
 ;    precision: Convergence tolerance of nonlinear least-squares fit.
 ;      Default: 5d-5.
 ;
@@ -159,6 +164,8 @@
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
 ; 05/28/2013 DGG optionally return residuals from fit.
 ; 05/29/2013 DGG optionally return fit itself.  Honor FIXNP flag.
+; 06/04/2013 DGG use ERRORS rather than WEIGHTS.  Document ERRORS
+;    keyword.  Overhaul sampling code when called with deinterlace.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -229,7 +236,7 @@ function fitlmsphere, a, $                     ; image
                       p0, $                    ; starting estimates for parameters
                       lambda, $                ; wavelength of light [micrometers]
                       mpp, $                   ; micrometers per pixel
-                      weights = weights, $     ; estimate for weighting at each pixel
+                      errors = errors, $       ; error estimate at each pixel
                       precision = precision, $ ; precision of convergence
                       chisq = chisq, $         ; chi-squared value of fit
                       yfit = yfit, $           ; best fit to data
@@ -288,9 +295,18 @@ nx = sz[0]
 ny = sz[1]
 npts = nx*ny
 
-err = 0                         ; use WEIGHTS in favor of ERR for MPFIT
-if n_elements(weights) ne npts then $
-   weights = replicate(1., npts)
+aa = double(a)
+err = isa(errors, /number) ? double(errors) : 1.D
+
+y0 = 0
+dy = 1
+if keyword_set(deinterlace) then begin
+   y0 = deinterlace mod 2
+   dy = 2
+   aa = a[*, y0:*:2]
+   if isa(err, /array) then $
+      err = err[*, y0:*:2]
+endif
 
 ;;; Constraints on fitting parameters
 nparams = n_elements(p0)
@@ -363,43 +379,28 @@ if keyword_set(object) then begin
 	return, -1
    endif
 
-   aa = double(a)
-   if keyword_set(deinterlace) then begin
-      weights = reform(weights, nx, ny)
-      w = where((lindgen(ny) mod 2) eq (deinterlace mod 2), ny)
-      aa = aa[*, w]
-      weights = weights[*, w]
-   endif
-      
    p = mpfitfun('lmsphere_objf', obj, aa, err, p0, $
-                weights = weights, ftol = precision, $
+                ftol = precision, $
                 parinfo = parinfo, /fastnorm, $
                 perror = perror, bestnorm = chisq, dof = dof, $
                 status = status, errmsg = errmsg, quiet = quiet, $
                 yfit = yfit, best_resid = residuals)
    residuals = reform(residuals, nx, n_elements(residuals)/nx)
 endif else begin
+   sz = size(aa, /dimensions)
+   nx = sz[0]
+   ny = sz[1]
    x = dindgen(nx)
-   y = dindgen(1, ny)
+   y = y0 + dy*dindgen(1, ny)
    x = rebin(x, nx, ny, /sample)
    y = rebin(y, nx, ny, /sample)
-
-   aa = double(reform(a, npts))
-
-   if keyword_set(deinterlace) then begin
-      w = where((y mod 2) eq (deinterlace mod 2))
-      x = x[w]
-      y = y[w]
-      aa = aa[w]
-      weights = weights[w]
-   endif
 
    ;; parameters passed to the fitting function
    argv = {lambda:lambda, mpp:mpp, precision:precision, gpu:gpu}
 
    ;; perform fit
    p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
-                  weights = weights, ftol = precision, $
+                  ftol = precision, $
                   parinfo = parinfo, /fastnorm, $
                   perror = perror, bestnorm = chisq, dof = dof, $
                   status = status, errmsg = errmsg, quiet = quiet, $
