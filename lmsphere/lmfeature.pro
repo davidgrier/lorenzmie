@@ -76,6 +76,8 @@
 ;
 ; KEYWORD OUTPUTS:
 ;    residuals: Residuals of best fit.
+;
+;    count: number of features actually returned
 ;      
 ; PROCEDURE:
 ;   CT_FEATURE identifies candidate features using CIRCLETRANSFORM.
@@ -142,6 +144,7 @@
 ;   Use fringes to set range for fits.
 ; 06/02/2013 DGG Use deviates from azimuthal average to compute
 ;   weightings for fits.  Added NFRINGES and MAXREFITS keywords.
+; 06/04/2013 DGG Added COUNT keyword.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -178,6 +181,7 @@ function lmfeature, a, lambda, mpp, $
                     maxrefits = maxrefits, $
                     nfringes = nfringes, $
                     pickn = pickn, $
+                    count = count, $
                     ap = ap, $
                     fixap = fixap, $
                     np = np0, $
@@ -248,14 +252,14 @@ quiet = ~keyword_set(debug)
 
 ;;; Find candidate features
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
-               pickn = pickn, count = count)
+               pickn = pickn, count = nfeatures)
 
 if doreport then begin
    print
    message, 'noise: ' + strtrim(noise, 2), /inf
    if keyword_set(deinterlace) then $
       message, 'analyzing ' + ((deinterlace mod 2) ? 'odd' : 'even') + ' field', /inf
-   message, 'features found: ' + strtrim(count, 2), /inf
+   message, 'features found: ' + strtrim(nfeatures, 2), /inf
 endif
 
 if dographics then begin
@@ -274,7 +278,8 @@ if ~isa(nfringes, /scalar, /number) then nfringes = 20
 if ~isa(maxrefits, /scalar, /number) then maxrefits = 1
 
 ;;; Loop over features
-for ndx = 0L, count - 1 do begin
+count = 0L
+for ndx = 0L, nfeatures - 1 do begin
    if doreport then message, 'feature ' + strtrim(ndx, 2), /inf
 
    ;; Use starting estimate for particle position
@@ -283,7 +288,7 @@ for ndx = 0L, count - 1 do begin
    dorefit = 0
 refit:
 
-   aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal standard deviation
+   aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal average
    aa[0:1] = aa[2]                                        ; FIXME: problem with aziavg?
    rn = extrema(aa, ismin = ismin)                        ; coordinates of maxima and minima
 
@@ -430,6 +435,7 @@ refit:
 
    thisfeature = [[thisfeature], [thischisq, range]]
    features.add, thisfeature
+   count++
 endfor
 
 return, features
