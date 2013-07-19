@@ -166,11 +166,12 @@
 ; 05/29/2013 DGG optionally return fit itself.  Honor FIXNP flag.
 ; 06/04/2013 DGG use ERRORS rather than WEIGHTS.  Document ERRORS
 ;    keyword.  Overhaul sampling code when called with deinterlace.
+; 07/19/2013 DGG object now handles CPU code.  Use object throughout.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
 ;-
-function lmsphere_objf, obj, p
+function lmsphere_f, obj, p
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -190,46 +191,6 @@ obj.setproperty, rp = p[0:2], ap = p[3], np = dcomplex(p[4], p[5]), $
                  alpha = p[8], delta = p[9]  
 
 return, obj.hologram
-end
-
-function lmsphere_f, x, y, p, $
-                     lambda = lambda, $
-                     mpp = mpp, $
-                     gpu = gpu                      
-
-COMPILE_OPT IDL2, HIDDEN
-
-; p[0] : xp         x position of sphere center
-; p[1] : yp         y position of sphere center
-; p[2] : zp         z position of sphere center
-; p[3] : ap         radius of sphere
-; p[4] : np         real part of sphere's refractive index
-; p[5] : kp         imaginary part of sphere's refractive index
-; p[6] : nm         real part of medium's refractive index
-; p[7] : km         imaginary part of medium's refractive index
-; p[8] : alpha      amplitude of illumination at particle's position
-; p[9] : delta      wavefront distortion at particle's position
-
-xx = x - p[0]
-yy = y - p[1]
-zp = p[2]
-ap = p[3]
-np = dcomplex(p[4], p[5])
-nm = dcomplex(p[6], p[7])
-alpha = p[8]
-delta = p[9]
-
-field = spherefield(xx, yy, zp, ap, np, nm, lambda, mpp, $
-                    /cartesian, $
-                    gpu = gpu, $
-                    k = k)
-
-; interference between light scattered by the particle
-; and a plane wave polarized along x and propagating along z
-field *= alpha * exp(dcomplex(0, -k*(zp + delta))) ; amplitude and phase factors
-field[0, *] += 1.                        ; \hat{x}
-
-return, total(real_part(field * conj(field)), 1)
 end
 
 function fitlmsphere, a, $                     ; image
@@ -361,51 +322,31 @@ parinfo[9].fixed = keyword_set(fixdelta)
 ; errors from fit
 perror = fltarr(nparams)
 
-if keyword_set(object) then begin
-   obj = DGGdhmLMSphere(dim = [nx, ny], $
-                        lambda = lambda, $
-                        mpp = mpp, $
-                        rp = p0[0:2], $
-                        ap = p0[3], $
-                        nm = dcomplex(p0[4], p0[5]), $
-                        np = dcomplex(p0[6], p0[7]), $
-                        alpha = p0[8], $
-                        delta = p0[9], $
-                        deinterlace = deinterlace $
-                       )
+obj = DGGdhmLMSphere(dim = [nx, ny], $
+                     lambda = lambda, $
+                     mpp = mpp, $
+                     rp = p0[0:2], $
+                     ap = p0[3], $
+                     nm = dcomplex(p0[4], p0[5]), $
+                     np = dcomplex(p0[6], p0[7]), $
+                     alpha = p0[8], $
+                     delta = p0[9], $
+                     deinterlace = deinterlace, $
+                     gpu = gpu $
+                    )
 
-   if ~isa(obj, 'DGGdhmLMSphere') then begin
-	message, 'could not create a DGGdhmLMSphere object', /inf
-	return, -1
-   endif
+if ~isa(obj, 'DGGdhmLMSphere') then begin
+   message, 'could not create a DGGdhmLMSphere object', /inf
+   return, -1
+endif
 
-   p = mpfitfun('lmsphere_objf', obj, aa, err, p0, $
-                ftol = precision, $
-                parinfo = parinfo, /fastnorm, $
-                perror = perror, bestnorm = chisq, dof = dof, $
-                status = status, errmsg = errmsg, quiet = quiet, $
-                yfit = yfit, best_resid = residuals)
-   residuals = reform(residuals, nx, n_elements(residuals)/nx)
-endif else begin
-   sz = size(aa, /dimensions)
-   nx = sz[0]
-   ny = sz[1]
-   x = dindgen(nx)
-   y = y0 + dy*dindgen(1, ny)
-   x = rebin(x, nx, ny, /sample)
-   y = rebin(y, nx, ny, /sample)
-
-   ;; parameters passed to the fitting function
-   argv = {lambda:lambda, mpp:mpp, precision:precision, gpu:gpu}
-
-   ;; perform fit
-   p = mpfit2dfun('lmsphere_f', x, y, aa, err, p0, functargs = argv, $
-                  ftol = precision, $
-                  parinfo = parinfo, /fastnorm, $
-                  perror = perror, bestnorm = chisq, dof = dof, $
-                  status = status, errmsg = errmsg, quiet = quiet, $
-                  yfit = yfit, best_resid = residuals)
-endelse
+p = mpfitfun('lmsphere_f', obj, aa, err, p0, $
+             ftol = precision, $
+             parinfo = parinfo, /fastnorm, $
+             perror = perror, bestnorm = chisq, dof = dof, $
+             status = status, errmsg = errmsg, quiet = quiet, $
+             yfit = yfit, best_resid = residuals)
+residuals = reform(residuals, nx, n_elements(residuals)/nx)
 
 if status le 0 then begin 
    message, errmsg, /inf

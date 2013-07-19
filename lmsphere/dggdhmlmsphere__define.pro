@@ -151,8 +151,8 @@ stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
 x = rebin(dindgen(nx) - xc, nx, ny, /sample)
 y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
-x = reform(x, npts);
-y = reform(y, npts);
+x = reform(x, npts, /overwrite)
+y = reform(y, npts, /overwrite)
 z = self.rp[2]
 
 ; convert to spherical coordinates centered on the sphere.
