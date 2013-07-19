@@ -146,6 +146,7 @@
 ;   weightings for fits.  Added NFRINGES and MAXREFITS keywords.
 ; 06/04/2013 DGG Added COUNT keyword.  Estiamte per-pixel errors for
 ;   two-dimensional fit.
+; 07/19/2013 DGG Update for CPU object implementation.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -399,7 +400,7 @@ refit:
                              fixalpha = fixalpha, $
                              fixdelta = fixdelta || peggedalpha, $
                              deinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0, $
-                             object = gpu, $
+                             gpu = gpu, $
                              quiet = quiet)
 
    ;;; Handle failure
