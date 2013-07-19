@@ -107,14 +107,15 @@
 ;    releases.
 ; 07/19/2013 DGG Initial version of ComputeCPU.  Refactored
 ;    deinterlace code.  Corrected divide-by-zero corner case for GPU.
-;    Automatically select CPU or GPU calculation.
+;    Automatically select CPU or GPU calculation.  Reorder CPU arrays
+;    for greater efficiency: [npts,3] rather than [3,npts].
 ;
 ; NOTES:
 ; Allocate CPU storage?
-; Reorder CPU arrays for greater efficiency: [npts,3] rather than [3,npts]
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; Optionally force single precision?
+; Allow for indexing points -- calculate only at specified points
 ; 
 ; Copyright (c) 2011-2013 David G. Grier
 ;-    
@@ -150,6 +151,8 @@ stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
 x = rebin(dindgen(nx) - xc, nx, ny, /sample)
 y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
+x = reform(x, npts);
+y = reform(y, npts);
 z = self.rp[2]
 
 ; convert to spherical coordinates centered on the sphere.
@@ -179,11 +182,11 @@ pi_nm1 = 0.d                    ; \pi_0(\cos\theta)
 pi_n   = 1.d                    ; \pi_1(\cos\theta)
 
 ; storage for vector spherical harmonics: [r,theta,phi]
-Mo1n = dcomplexarr(3, npts)
-Ne1n = dcomplexarr(3, npts)
+Mo1n = dcomplexarr(npts, 3)
+Ne1n = dcomplexarr(npts, 3)
 
 ; storage for scattered field
-Es = dcomplexarr(3, npts)
+Es = dcomplexarr(npts, 3)
 
 ; Compute field by summing multipole contributions
 for n = 1.d, nc do begin
@@ -199,14 +202,14 @@ for n = 1.d, nc do begin
     xi_n = (2.d*n - 1.d) * xi_nm1 / kr - xi_nm2    ; \xi_n(kr)
 
 ; vector spherical harmonics (4.50)
-;   Mo1n[0,*] = 0.d             ; no radial component
-    Mo1n[1,*] = pi_n * xi_n     ; ... divided by cosphi/kr
-    Mo1n[2,*] = tau_n * xi_n    ; ... divided by sinphi/kr
+;   Mo1n[0, 0] = 0.d             ; no radial component
+    Mo1n[0, 1] = pi_n * xi_n     ; ... divided by cosphi/kr
+    Mo1n[0, 2] = tau_n * xi_n    ; ... divided by sinphi/kr
 
     dn = (n * xi_n)/kr - xi_nm1
-    Ne1n[0,*] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
-    Ne1n[1,*] = tau_n * dn      ; ... divided by cosphi/kr
-    Ne1n[2,*] = pi_n  * dn      ; ... divided by sinphi/kr
+    Ne1n[0, 0] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
+    Ne1n[0, 1] = tau_n * dn      ; ... divided by cosphi/kr
+    Ne1n[0, 2] = pi_n  * dn      ; ... divided by sinphi/kr
 
 ; prefactor, page 93
     En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
@@ -228,9 +231,9 @@ endfor
 ; geometric factors were divided out of the vector
 ; spherical harmonics for accuracy and efficiency ...
 ; ... put them back at the end.
-Es[0,*] *= cosphi * sintheta / kr^2
-Es[1,*] *= cosphi / kr
-Es[2,*] *= sinphi / kr
+Es[*, 0] *= cosphi * sintheta / kr^2
+Es[*, 1] *= cosphi / kr
+Es[*, 2] *= sinphi / kr
 
 ;;; Hologram
 ;;;
@@ -242,11 +245,12 @@ Es[2,*] *= sinphi / kr
 ;           - \sin\phi \hat{\phi}
 ;
 Es *= self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
-Es[0, *] += cosphi * sintheta
-Es[1, *] += cosphi * costheta
-Es[2, *] -= sinphi
+Es[*, 0] += cosphi * sintheta
+Es[*, 1] += cosphi * costheta
+Es[*, 2] -= sinphi
 
-*self.hologram = reform(total(real_part(Es * conj(Es)), 1), self.nx, self.ny)
+;*self.hologram = reform(total(real_part(Es * conj(Es)), 1), self.nx, self.ny)
+*self.hologram = reform(total(real_part(Es * conj(Es)), 2), self.nx, self.ny)
 
 status = check_math()
 !except = currentexcept                ; restore math error checking
