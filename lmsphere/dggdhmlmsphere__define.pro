@@ -96,7 +96,7 @@
 ; 06/08/2012 DGG & Paige Hasebe (NYUAD) project into spherical
 ;    coordinates rather than Cartesion for efficiency.
 ; 06/13/2012 DGG Scattered field is stored internally in spherical
-;    coordinates as gpu.Es1, gpu.Es2 and gpu.Es3.  Added FIELD property
+;    coordinates as v.Es1, v.Es2 and v.Es3.  Added FIELD property
 ;    for access.
 ; 06/18/2012 DGG Added GetProperty method for AB: scattering
 ;    coefficients may be provided instead of being computed.
@@ -106,14 +106,15 @@
 ; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier
 ;    releases.
 ; 07/19/2013 DGG Initial version of ComputeCPU.  Refactored
-;    deinterlace code.
+;    deinterlace code.  Corrected divide-by-zero corner case for GPU.
+;    Automatically select CPU or GPU calculation.
 ;
 ; NOTES:
-; Allocate CPU storage.
-; Select CPU versus GPU.
+; Allocate CPU storage?
 ; Reorder CPU arrays for greater efficiency: [npts,3] rather than [3,npts]
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
+; Optionally force single precision?
 ; 
 ; Copyright (c) 2011-2013 David G. Grier
 ;-    
@@ -127,8 +128,11 @@ pro DGGdhmLMSphere::ComputeCPU
 
 COMPILE_OPT IDL2, HIDDEN
 
-;;; hook for CPU-based computation
-;;; not implemented yet
+; turn off math exceptions for floating point underflow errors
+currentexcept = !except
+!except = 0
+void = check_math()
+
 lambda = self.lambda / real_part(self.nm) / self.mpp ; wavelength [pixels]
 k = 2.d * !dpi / lambda                              ; wavenumber [pixel^-1]
 ci = dcomplex(0, 1)                                  ; imaginary unit
@@ -238,12 +242,14 @@ Es[2,*] *= sinphi / kr
 ;           - \sin\phi \hat{\phi}
 ;
 Es *= self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
-Es[0, *] += sintheta * cosphi
-Es[1, *] += costheta * cosphi
+Es[0, *] += cosphi * sintheta
+Es[1, *] += cosphi * costheta
 Es[2, *] -= sinphi
 
 *self.hologram = reform(total(real_part(Es * conj(Es)), 1), self.nx, self.ny)
 
+status = check_math()
+!except = currentexcept                ; restore math error checking
 end
 
 ;;;;
@@ -255,6 +261,11 @@ end
 pro DGGdhmLMSphere::Compute
 
 COMPILE_OPT IDL2, HIDDEN
+
+if ~self.gpu then begin
+   self->ComputeCPU
+   return
+endif
 
 ; turn off math exceptions for floating point underflow errors
 currentexcept = !except
@@ -268,7 +279,7 @@ ci = dcomplex(0, 1)                                  ; imaginary unit
 ab = *self.ab                   ; Lorenz-Mie coefficients
 nc = n_elements(ab[0,*]) - 1    ; number of terms
 
-gpu = *(self.gpu)               ; structure of GPU variables
+v = *(self.v)                   ; structure of GPU variables
 
 xc = self.rp[0]
 yc = self.rp[1] - (self.deinterlace mod 2)
@@ -278,66 +289,72 @@ nx = self.nx
 ny = self.ny
 stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
-gpu.x = gpumake_array(nx, ny, type = self.type, /index)
-gpu.y = gpucopy(gpu.x, LHS = gpu.y)
-gpu.y = gpufloor(1.d, 1.d/nx, gpu.y, 0.d, 0.d, LHS = gpu.y)
-gpu.x = gpuadd(1.d, gpu.x, -nx, gpu.y, -xc, LHS = gpu.x)
-gpu.y = gpuadd(stride, gpu.y, 0.d, gpu.y, -yc, LHS = gpu.y)
-gpu.z = gpuadd(0.d, gpu.x, 0.d, gpu.x, self.rp[2], LHS = gpu.z, /NONBLOCKING)
+v.x = gpumake_array(nx, ny, type = self.type, /index)
+v.y = gpucopy(v.x, LHS = v.y)
+v.y = gpufloor(1.d, 1.d/nx, v.y, 0.d, 0.d, LHS = v.y)
+v.x = gpuadd(1.d, v.x, -nx, v.y, -xc, LHS = v.x)
+v.y = gpuadd(stride, v.y, 0.d, v.y, -yc, LHS = v.y)
+v.z = gpuadd(0.d, v.x, 0.d, v.x, self.rp[2], LHS = v.z, /NONBLOCKING)
 
 ; rho = sqrt(x^2 + y^2)
-gpu.rho = gpumult(gpu.x, gpu.x, LHS = gpu.rho, /NONBLOCKING)
-gpu.kr  = gpumult(gpu.y, gpu.y, LHS = gpu.kr)
-gpu.rho = gpuadd(gpu.rho, gpu.kr, LHS = gpu.rho)
+v.rho = gpumult(v.x, v.x, LHS = v.rho, /NONBLOCKING)
+v.kr  = gpumult(v.y, v.y, LHS = v.kr)
+v.rho = gpuadd(v.rho, v.kr, LHS = v.rho)
 
 ; r = sqrt(rho^2 + z^2)
-gpu.kr = gpusqrt(1.d, 1.d, gpu.rho, self.rp[2]^2, 0.d, LHS = gpu.kr)
+v.kr = gpusqrt(1.d, 1.d, v.rho, self.rp[2]^2, 0.d, LHS = v.kr)
 ;;; NOTE: Under GPULib 1.4.4, the 5-parameter form of gpusqrt
 ; incorrectly yields NAN for some input values on some GPUs, whereas
 ; the 1-parameter form works properly.  This seems to be fixed under
 ; GPULib 1.6.0.
-; gpu.kr = gpuadd(1.d, gpu.rho, 0.d, gpu.rho, self.rp[2]^2, LHS = gpu.kr)
-; gpu.kr = gpusqrt(gpu.kr, LHS = gpu.kr, /NONBLOCKING)
-gpu.rho = gpusqrt(gpu.rho, LHS = gpu.rho)
+; v.kr = gpuadd(1.d, v.rho, 0.d, v.rho, self.rp[2]^2, LHS = v.kr)
+; v.kr = gpusqrt(v.kr, LHS = v.kr, /NONBLOCKING)
+v.rho = gpusqrt(v.rho, LHS = v.rho)
 
 ; polar angle
-gpu.sintheta = gpudiv(gpu.rho, gpu.kr, LHS = gpu.sintheta, /NONBLOCKING)
-gpu.costheta = gpudiv(gpu.z,   gpu.kr, LHS = gpu.costheta, /NONBLOCKING)
+v.sintheta = gpudiv(v.rho, v.kr, LHS = v.sintheta, /NONBLOCKING)
+v.costheta = gpudiv(v.z,   v.kr, LHS = v.costheta, /NONBLOCKING)
 
 ; azimuthal angle
-gpu.sinphi = gpudiv(gpu.y, gpu.rho, LHS = gpu.sinphi, /NONBLOCKING)
-gpu.cosphi = gpudiv(gpu.x, gpu.rho, LHS = gpu.cosphi, /NONBLOCKING)
 ;;; correct divide-by-zero errors when rho is small
 if ((abs(xc) + abs(yc)) mod 1.) lt 1e-3 then begin ; center falls on pixel center
    ;; don't do anything if the center is outside the array
    if (xc ge 0 and xc lt nx and yc ge 0 and yc lt ny) then begin
-      (gpu.sinphi)[xc, yc] = 0.
-      (gpu.cosphi)[xc, yc] = 1.
+      rho = gpugetarr(v.rho)
+      rho[xc, yc] = 1.
+      gpuputarr, rho, v.rho
+;      (v.rho)[xc, yc] = 1.
+      x = gpugetarr(v.x)
+      x[xc, yc] = 1.
+      gpuputarr, x, v.x
+;      (v.x)[xc, yc] = 1.
    endif
 endif
+v.sinphi = gpudiv(v.y, v.rho, LHS = v.sinphi, /NONBLOCKING)
+v.cosphi = gpudiv(v.x, v.rho, LHS = v.cosphi, /NONBLOCKING)
 
 ; scale distances by wavenumber
-gpu.kr = gpuadd(k, gpu.kr, 0.d, gpu.kr, 0.d, LHS = gpu.kr)
+v.kr = gpuadd(k, v.kr, 0.d, v.kr, 0.d, LHS = v.kr)
 
 ; starting points for recursive function evaluation ...
 ; ... Riccati-Bessel radial functions, page 478
 ; \xi_{0}(kr)  = sin(kr) - i cos(kr)
 ; \xi_{-1}(kr) = cos(kr) + i sin(kr)
-gpu.x = gpucos(gpu.kr, LHS = gpu.x, /NONBLOCKING)
-gpu.y = gpusin(gpu.kr, LHS = gpu.y)
-gpu.xi[1] = gpuadd(1.d, gpu.y, -ci, gpu.x, 0.d, LHS = gpu.xi[1], /NONBLOCKING)
-gpu.xi[2] = gpuadd(1.d, gpu.x,  ci, gpu.y, 0.d, LHS = gpu.xi[2], /NONBLOCKING)
+v.x = gpucos(v.kr, LHS = v.x, /NONBLOCKING)
+v.y = gpusin(v.kr, LHS = v.y)
+v.xi[1] = gpuadd(1.d, v.y, -ci, v.x, 0.d, LHS = v.xi[1], /NONBLOCKING)
+v.xi[2] = gpuadd(1.d, v.x,  ci, v.y, 0.d, LHS = v.xi[2], /NONBLOCKING)
 
 ; ... angular functions (4.47), page 95
 ; \pi_0(\cos\theta) = 0
 ; \pi_1(\cos\theta) = 1
-gpu.pi[1] = gpuadd(0.d, gpu.z, 0.d, gpu.z, 0.d, LHS = gpu.pi[1], /NONBLOCKING)
-gpu.pi[0] = gpuadd(0.d, gpu.z, 0.d, gpu.z, 1.d, LHS = gpu.pi[0], /NONBLOCKING)
+v.pi[1] = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.pi[1], /NONBLOCKING)
+v.pi[0] = gpuadd(0.d, v.z, 0.d, v.z, 1.d, LHS = v.pi[0], /NONBLOCKING)
 
 ; ... scattered field
-gpu.Es1 = gpuadd(0.d, gpu.z, 0.d, gpu.z, 0.d, LHS = gpu.Es1, /NONBLOCKING)
-gpu.Es2 = gpuadd(0.d, gpu.z, 0.d, gpu.z, 0.d, LHS = gpu.Es2, /NONBLOCKING)
-gpu.Es3 = gpuadd(0.d, gpu.z, 0.d, gpu.z, 0.d, LHS = gpu.Es3, /NONBLOCKING)
+v.Es1 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es1, /NONBLOCKING)
+v.Es2 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es2, /NONBLOCKING)
+v.Es3 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es3, /NONBLOCKING)
 
 ; Compute field by summing multipole contributions
 for n = 1.d, nc do begin
@@ -347,51 +364,51 @@ for n = 1.d, nc do begin
 ;  swisc = \pi_n * \cos\theta
 ;  twisc = swisc - \pi_{n-1}
 ;  tau = n * twisc - \pi_{n-1}
-   gpu.x = gpumult(gpu.pi[0], gpu.costheta, LHS = gpu.x) ; swisc in x
-   gpu.y = gpusub(gpu.x, gpu.pi[1], LHS = gpu.y)         ; twisc in y
-   gpu.z = gpuadd(1.d, gpu.pi[1], -n, gpu.y, 0.d, $
-                  LHS = gpu.z, /NONBLOCKING) ; -tau in z
+   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x) ; swisc in x
+   v.y = gpusub(v.x, v.pi[1], LHS = v.y)         ; twisc in y
+   v.z = gpuadd(1.d, v.pi[1], -n, v.y, 0.d, $
+                  LHS = v.z, /NONBLOCKING) ; -tau in z
 
 ; ... Riccati-Bessel function, page 478
 ; \xi_n = (2n - 1) xi_{n-1} / kr - xi_{n-2}
-   gpu.xi[0] = gpudiv(gpu.xi[1], gpu.kr, LHS = gpu.xi[0])
-   gpu.xi[0] = gpuadd(2.d*n - 1.d, gpu.xi[0], -1.d, gpu.xi[2], 0.d, $
-                      LHS = gpu.xi[0])
+   v.xi[0] = gpudiv(v.xi[1], v.kr, LHS = v.xi[0])
+   v.xi[0] = gpuadd(2.d*n - 1.d, v.xi[0], -1.d, v.xi[2], 0.d, $
+                      LHS = v.xi[0])
 
 ; ... Deirmendjian's derivative
 ; d_n = (n xi_n)/kr - xi_{n-1}
-   gpu.dn = gpudiv(gpu.xi[0], gpu.kr, LHS = gpu.dn)
-   gpu.dn = gpuadd(n, gpu.dn, -1.d, gpu.xi[1], 0.d, $
-                   LHS = gpu.dn, /NONBLOCKING)
+   v.dn = gpudiv(v.xi[0], v.kr, LHS = v.dn)
+   v.dn = gpuadd(n, v.dn, -1.d, v.xi[1], 0.d, $
+                   LHS = v.dn, /NONBLOCKING)
 
 ; Vector spherical harmonics (4.50)
 ;  Mo1n[0,*] = 0.d            ; no radial component
 ;  Mo1n[1,*] = pi_n * xi_n    ; ... divided by cosphi/kr
 ;  Mo1n[2,*] = -tau_n * xi_n  ; ... divided by sinphi/kr
-   gpu.Mo1n2 = gpumult(gpu.pi[0], gpu.xi[0], LHS = gpu.Mo1n2, /NONBLOCKING)
-   gpu.Mo1n3 = gpumult(gpu.z, gpu.xi[0], LHS = gpu.Mo1n3, /NONBLOCKING)
+   v.Mo1n2 = gpumult(v.pi[0], v.xi[0], LHS = v.Mo1n2, /NONBLOCKING)
+   v.Mo1n3 = gpumult(v.z, v.xi[0], LHS = v.Mo1n3, /NONBLOCKING)
 
 ;  Ne1n[0,*] = n*(n+1) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
 ;  Ne1n[1,*] = -tau_n * dn    ; ... divided by cosphi/kr
 ;  Ne1n[2,*] = pi_n * dn      ; ... divided by sinphi/kr
-   gpu.Ne1n1 = gpumult(n*(n+1.d), gpu.pi[0], 1.d, gpu.xi[0], 0.d, $
-                       LHS = gpu.Ne1n1, /NONBLOCKING)
-   gpu.Ne1n2 = gpumult(gpu.z, gpu.dn, LHS = gpu.Ne1n2, /NONBLOCKING)
-   gpu.Ne1n3 = gpumult(gpu.pi[0], gpu.dn, LHS = gpu.Ne1n3)
+   v.Ne1n1 = gpumult(n*(n+1.d), v.pi[0], 1.d, v.xi[0], 0.d, $
+                       LHS = v.Ne1n1, /NONBLOCKING)
+   v.Ne1n2 = gpumult(v.z, v.dn, LHS = v.Ne1n2, /NONBLOCKING)
+   v.Ne1n3 = gpumult(v.pi[0], v.dn, LHS = v.Ne1n3)
    
 ; upward recurrences ...
 ; ... angular functions (4.47)
 ; Method described by Wiscombe (1980)
 ;  pi_{n-1} = pi_n
 ;  pi_n = swisc + (n + 1) twisc / n
-   gpu.pi = shift(gpu.pi, 1)
-   gpu.pi[0] = gpuadd(1.d, gpu.x, (n + 1.d)/n, gpu.y, 0.d, $
-                      LHS = gpu.pi[0], /NONBLOCKING)
+   v.pi = shift(v.pi, 1)
+   v.pi[0] = gpuadd(1.d, v.x, (n + 1.d)/n, v.y, 0.d, $
+                      LHS = v.pi[0], /NONBLOCKING)
 
 ; ... Riccati-Bessel function
 ;  xi_{n-2} = xi_{n-1}
 ;  xi_{n-1} = xi_n
-   gpu.xi = shift(gpu.xi, 1)
+   v.xi = shift(v.xi, 1)
 
 ; Field calculation
 ; prefactor, page 93
@@ -399,15 +416,15 @@ for n = 1.d, nc do begin
    an = En * ci * ab[0, n]
    bn = -En * ab[1, n]
 ; scattered field in spherical coordinates (4.45)
-   gpu.Es1 = gpuadd(1.d, gpu.Es1, an, gpu.Ne1n1, 0.d, $
-                    LHS = gpu.Es1, /NONBLOCKING)
-   gpu.Es2 = gpuadd(1.d, gpu.Es2, an, gpu.Ne1n2, 0.d, $
-                    LHS = gpu.Es2, /NONBLOCKING)
-   gpu.Es3 = gpuadd(1.d, gpu.Es3, an, gpu.Ne1n3, 0.d, LHS = gpu.Es3)
-   gpu.Es2 = gpuadd(1.d, gpu.Es2, bn, gpu.Mo1n2, 0.d, $
-                    LHS = gpu.Es2, /NONBLOCKING)
-   gpu.Es3 = gpuadd(1.d, gpu.Es3, bn, gpu.Mo1n3, 0.d, $
-                    LHS = gpu.Es3, /NONBLOCKING)
+   v.Es1 = gpuadd(1.d, v.Es1, an, v.Ne1n1, 0.d, $
+                    LHS = v.Es1, /NONBLOCKING)
+   v.Es2 = gpuadd(1.d, v.Es2, an, v.Ne1n2, 0.d, $
+                    LHS = v.Es2, /NONBLOCKING)
+   v.Es3 = gpuadd(1.d, v.Es3, an, v.Ne1n3, 0.d, LHS = v.Es3)
+   v.Es2 = gpuadd(1.d, v.Es2, bn, v.Mo1n2, 0.d, $
+                    LHS = v.Es2, /NONBLOCKING)
+   v.Es3 = gpuadd(1.d, v.Es3, bn, v.Mo1n3, 0.d, $
+                    LHS = v.Es3, /NONBLOCKING)
 endfor
 
 ;;; Scattered field 
@@ -416,13 +433,13 @@ endfor
 ;;;
 ; Geometric factors were divided out of the vector spherical harmonics
 ; for accuracy and efficiency.  Put them back in now:
-gpu.x = gpudiv(gpu.cosphi, gpu.kr, LHS = gpu.x, /NONBLOCKING)
-gpu.y = gpudiv(gpu.sintheta, gpu.kr, LHS = gpu.y, /NONBLOCKING)
-gpu.z = gpudiv(gpu.sinphi, gpu.kr, LHS = gpu.z)
-gpu.Es1 = gpumult(gpu.Es1, gpu.x, LHS = gpu.Es1)
-gpu.Es1 = gpumult(gpu.Es1, gpu.y, LHS = gpu.Es1, /NONBLOCKING)
-gpu.Es2 = gpumult(gpu.Es2, gpu.x, LHS = gpu.Es2, /NONBLOCKING)
-gpu.Es3 = gpumult(gpu.Es3, gpu.z, LHS = gpu.Es3)
+v.x = gpudiv(v.cosphi, v.kr, LHS = v.x, /NONBLOCKING)
+v.y = gpudiv(v.sintheta, v.kr, LHS = v.y, /NONBLOCKING)
+v.z = gpudiv(v.sinphi, v.kr, LHS = v.z)
+v.Es1 = gpumult(v.Es1, v.x, LHS = v.Es1)
+v.Es1 = gpumult(v.Es1, v.y, LHS = v.Es1, /NONBLOCKING)
+v.Es2 = gpumult(v.Es2, v.x, LHS = v.Es2, /NONBLOCKING)
+v.Es3 = gpumult(v.Es3, v.z, LHS = v.Es3)
 
 ;;; Hologram
 ;;;
@@ -434,26 +451,26 @@ gpu.Es3 = gpumult(gpu.Es3, gpu.z, LHS = gpu.Es3)
 ;           - \sin\phi \hat{\phi}
 ;
 fac = self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
-gpu.x = gpumult(gpu.sintheta, gpu.cosphi, LHS = gpu.x, /NONBLOCKING)
-gpu.y = gpumult(gpu.costheta, gpu.cosphi, LHS = gpu.y, /NONBLOCKING)
-gpu.xi[2] = gpuadd(-1., gpu.sinphi, fac, gpu.Es3, 0., LHS = gpu.xi[2])
-gpu.xi[1] = gpuadd(1., gpu.y, fac, gpu.Es2, 0., LHS = gpu.xi[1], /NONBLOCKING)
-gpu.xi[0] = gpuadd(1., gpu.x, fac, gpu.Es1, 0., LHS = gpu.xi[0])
+v.x = gpumult(v.sintheta, v.cosphi, LHS = v.x, /NONBLOCKING)
+v.y = gpumult(v.costheta, v.cosphi, LHS = v.y, /NONBLOCKING)
+v.xi[2] = gpuadd(-1., v.sinphi, fac, v.Es3, 0., LHS = v.xi[2])
+v.xi[1] = gpuadd(1., v.y, fac, v.Es2, 0., LHS = v.xi[1], /NONBLOCKING)
+v.xi[0] = gpuadd(1., v.x, fac, v.Es1, 0., LHS = v.xi[0])
 ;
 ; Intensity is squared magnitude
 ;
-gpu.x = gpuconj(gpu.xi[0], LHS = gpu.x, /NONBLOCKING)
-gpu.y = gpuconj(gpu.xi[1], LHS = gpu.y, /NONBLOCKING)
-gpu.z = gpuconj(gpu.xi[2], LHS = gpu.z)
-gpu.xi[0] = gpumult(gpu.xi[0], gpu.x, LHS = gpu.xi[0], /NONBLOCKING)
-gpu.xi[1] = gpumult(gpu.xi[1], gpu.y, LHS = gpu.xi[1], /NONBLOCKING)
-gpu.xi[2] = gpumult(gpu.xi[2], gpu.z, LHS = gpu.xi[2])
-gpu.dn = gpuadd(gpu.xi[0], gpu.xi[1], LHS = gpu.dn)
-gpu.dn = gpuadd(gpu.dn, gpu.xi[2], LHS = gpu.dn)
+v.x = gpuconj(v.xi[0], LHS = v.x, /NONBLOCKING)
+v.y = gpuconj(v.xi[1], LHS = v.y, /NONBLOCKING)
+v.z = gpuconj(v.xi[2], LHS = v.z)
+v.xi[0] = gpumult(v.xi[0], v.x, LHS = v.xi[0], /NONBLOCKING)
+v.xi[1] = gpumult(v.xi[1], v.y, LHS = v.xi[1], /NONBLOCKING)
+v.xi[2] = gpumult(v.xi[2], v.z, LHS = v.xi[2])
+v.dn = gpuadd(v.xi[0], v.xi[1], LHS = v.dn)
+v.dn = gpuadd(v.dn, v.xi[2], LHS = v.dn)
 
-gpu.hologram = gpureal(gpu.dn, LHS = gpu.hologram)
+v.hologram = gpureal(v.dn, LHS = v.hologram)
 
-*self.hologram = gpugetarr(gpu.hologram, LHS = *self.hologram)
+*self.hologram = gpugetarr(v.hologram, LHS = *self.hologram)
 
 status = check_math()
 !except = currentexcept                ; restore math error checking
@@ -592,7 +609,8 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  lambda = lambda, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
-                                 type = type
+                                 type = type, $
+                                 gpu = gpu
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -601,9 +619,9 @@ if arg_present(hologram) then $
 
 if arg_present(field) then begin
    field = dcomplexarr(3, self.dim[0], self.dim[1], /nozero)
-   field[0,*,*] = gpugetarr((*self.gpu).Es1, LHS = field[0,*,*])
-   field[1,*,*] = gpugetarr((*self.gpu).Es2, LHS = field[1,*,*])
-   field[2,*,*] = gpugetarr((*self.gpu).Es3, LHS = field[2,*,*])
+   field[0,*,*] = gpugetarr((*self.v).Es1, LHS = field[0,*,*])
+   field[1,*,*] = gpugetarr((*self.v).Es2, LHS = field[1,*,*])
+   field[2,*,*] = gpugetarr((*self.v).Es3, LHS = field[2,*,*])
 endif
 
 if arg_present(ab) then $
@@ -625,20 +643,8 @@ if arg_present(lambda) then lambda = self.lambda
 if arg_present(mpp) then mpp = self.mpp
 if arg_present(deinterlace) then deinterlace = self.deinterlace
 if arg_present(type) then type = self.type
+if arg_present(gpu) then gpu = self.gpu
 
-end
-
-;;;;
-;
-; DGGdhmLMSphere::CPUInit
-;
-; Allocate CPU variables
-;
-function DGGdhmLMSphere::CPUInit
-
-COMPILE_OPT IDL2, HIDDEN
-
-return, 0B
 end
 
 ;;;;
@@ -660,41 +666,40 @@ endif
 ;;; Initialize GPU
 gpuinit, /hardware, /quiet
 
-if (self.type eq 9) then $
-   self.type = (gpudoublecapable()) ? 9 : 6 ; dcomplex or complex
-ftype = (self.type eq 9) ? 5 : 4            ; double or float
+self.type = (gpudoublecapable()) ? 9 : 6 ; dcomplex or complex
+ftype = (self.type eq 9) ? 5 : 4         ; double or float
 
 ;;; Allocate GPU memory
 nx = self.nx
 ny = self.ny
 
-gpu = {SphereDHM_GPU_Variables, $
-       x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       y:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       z:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       rho:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       kr:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       sintheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       costheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       sinphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       cosphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       xi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-                 gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-                 gpumake_array(nx, ny, type = self.type, /NOZERO)], $
-       pi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-                 gpumake_array(nx, ny, type = self.type, /NOZERO)], $
-       Mo1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Mo1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Ne1n1:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Ne1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Ne1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Es1:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Es2:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       Es3:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       dn:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-       hologram: gpumake_array(nx, ny, type = ftype, /NOZERO) $
-      }
-self.gpu = ptr_new(gpu, /no_copy)
+v = {SphereDHM_GPU_Variables, $
+     x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     y:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     z:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     rho:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     kr:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     sintheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     costheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     sinphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     cosphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     xi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+               gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+               gpumake_array(nx, ny, type = self.type, /NOZERO)], $
+     pi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+               gpumake_array(nx, ny, type = self.type, /NOZERO)], $
+     Mo1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Mo1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Ne1n1:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Ne1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Ne1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Es1:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Es2:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     Es3:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     dn:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+     hologram: gpumake_array(nx, ny, type = ftype, /NOZERO) $
+    }
+self.v = ptr_new(v, /no_copy)
 
 return, 1B
 end
@@ -711,14 +716,14 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                xp = xp,         $ ; sphere position [pixel]
                                yp = yp,         $
                                zp = zp,         $
-                               rp = rp,         $  ; 3D position [pixel]
-                               ap = ap,         $  ; sphere radius [um]
-                               np = np,         $  ; sphere refractive index
-                               nm = nm,         $  ; medium refractive index
-                               alpha = alpha,   $  ; relative illumination amplitude
-                               delta = delta,   $  ; illumination wavefront distortion
+                               rp = rp,         $ ; 3D position [pixel]
+                               ap = ap,         $ ; sphere radius [um]
+                               np = np,         $ ; sphere refractive index
+                               nm = nm,         $ ; medium refractive index
+                               alpha = alpha,   $ ; relative illumination amplitude
+                               delta = delta,   $ ; illumination wavefront distortion
                                deinterlace = deinterlace, $
-                               single = single
+                               gpu = gpu          ; use GPU, if available
 
 COMPILE_OPT IDL2, HIDDEN
 
@@ -745,7 +750,7 @@ else begin
    return, 0B
 endelse
 
-self.type = (keyword_set(single)) ? 6 : 9
+self.type = 9                   ; default to double-precision
 
 self.nx = self.dim[0]
 self.ny = self.dim[1]
@@ -757,11 +762,9 @@ if isa(deinterlace, /scalar, /number) then begin
 endif
 
 ;;; Initialize GPU
-if ~(self->GPUInit()) then $
-   return, 0B
+self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
 
 ;;; Optional inputs
-
 if (n_elements(rp) eq 3) then $
    self.rp = double(rp)
 
@@ -832,19 +835,21 @@ COMPILE_OPT IDL2, HIDDEN
 if ptr_valid(self.hologram) then $
    ptr_free, self.hologram
 
-if ptr_valid(self.gpu) then begin
-   gpu = *(self.gpu)
-   gpufree, [gpu.x, gpu.y, gpu.z]
-   gpufree, [gpu.rho, gpu.kr]
-   gpufree, [gpu.sintheta, gpu.costheta, gpu.sinphi, gpu.cosphi]
-   gpufree, gpu.xi
-   gpufree, gpu.pi
-   gpufree, [gpu.Mo1n2, gpu.Mo1n3, gpu.Ne1n1, gpu.Ne1n2, gpu.Ne1n3]
-   gpufree, [gpu.Es1, gpu.Es2, gpu.Es3]
-   gpufree, gpu.dn
-   gpufree, gpu.hologram
-   ptr_free, self.gpu
+if self.gpu and ptr_valid(self.v) then begin
+   v = *(self.v)
+   gpufree, [v.x, v.y, v.z]
+   gpufree, [v.rho, v.kr]
+   gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
+   gpufree, v.xi
+   gpufree, v.pi
+   gpufree, [v.Mo1n2, v.Mo1n3, v.Ne1n1, v.Ne1n2, v.Ne1n3]
+   gpufree, [v.Es1, v.Es2, v.Es3]
+   gpufree, v.dn
+   gpufree, v.hologram
 endif
+
+if ptr_valid(self.v) then $
+   ptr_free, self.v
 
 end
 
@@ -863,8 +868,7 @@ struct = {DGGdhmLMSphere,            $
           hologram:    ptr_new(),    $ ; computed hologram
           dim:         [0L, 0L],     $ ; dimensions of hologram
           ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
-          gpu:         ptr_new(),    $ ; structure of GPU variables
-          cpu:         ptr_new(),    $ ; structure of CPU variables
+          v:           ptr_new(),    $ ; structure of preallocated variables
           type:        0,            $ ; data type (double if possible)
           rp:          dblarr(3),    $ ; 3D position [pixel]
           ap:          0.D,          $ ; sphere radius [um]
@@ -876,7 +880,8 @@ struct = {DGGdhmLMSphere,            $
           mpp:         0.D,          $ ; magnification [um/pixel]
           nx:          0L,           $ ; width of deinterlaced hologram
           ny:          0L,           $ ; height of deinterlaced hologram
-          deinterlace: 0             $ ; 0: none, 1: odd, 2: even
+          deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
+          gpu:         0             $ ; flag: 1 if GPU enabled
          }
 
 end
