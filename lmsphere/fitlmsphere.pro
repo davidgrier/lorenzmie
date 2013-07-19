@@ -71,9 +71,6 @@
 ;         systems with GPULib installed.
 ;         Requires NVIDIA GPU with CUDA support.
 ;
-;    object: If set, use a DGGdhmSphereDHM object to compute holograms.
-;         This requires GPULib.
-;
 ;    quiet: If set, do not show results of intermediate calculations.
 ;
 ; KEYWORD OUTPUTS:
@@ -167,6 +164,7 @@
 ; 06/04/2013 DGG use ERRORS rather than WEIGHTS.  Document ERRORS
 ;    keyword.  Overhaul sampling code when called with deinterlace.
 ; 07/19/2013 DGG object now handles CPU code.  Use object throughout.
+;    Remove OBJECT keyword.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -214,7 +212,6 @@ function fitlmsphere, a, $                     ; image
                       fixdelta = fixdelta, $   ; fix wavefront distortion
                       deinterlace = deinterlace, $
                       gpu = gpu, $             ; use GPU acceleration
-                      object = object, $       ; use DGGdhmSphereDHM object
                       quiet = quiet            ; don't print diagnostics
 
 COMPILE_OPT IDL2
