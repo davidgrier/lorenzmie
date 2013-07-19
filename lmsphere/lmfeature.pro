@@ -338,7 +338,7 @@ refit:
    ;; Model observed interference pattern as Poisson's spot to
    ;; obtain radius, ap, from axial position, zp
    if doap then $
-      ap = zp/(4.*k)*median(j1n/rn[where(ismin)])
+      ap = 0.9*zp/(4.*k)*median(j1n/rn[where(ismin)])
 
    ;; Estimate np: FIXME: currently uses input value: np0
 

@@ -102,7 +102,9 @@
 ; 10/13/2012 DGG Added DELTA property.  Renamed to DGGdhmLMSphere
 ; 03/13/2013 DGG origin of coordinate system is moved to lower-left
 ;    corner, rather than center.
-; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier releases.
+; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier
+;    releases.
+; 07/19/2013 DGG Inition version of ComputeCPU.
 ;
 ; NOTES:
 ; Implement CPU calculations for systems without GPULib.
@@ -123,6 +125,126 @@ COMPILE_OPT IDL2, HIDDEN
 
 ;;; hook for CPU-based computation
 ;;; not implemented yet
+lambda = self.lambda / real_part(self.nm) / self.mpp ; wavelength [pixels]
+k = 2.d * !dpi / lambda                              ; wavenumber [pixel^-1]
+ci = dcomplex(0, 1)                                  ; imaginary unit
+
+ab = *self.ab                   ; Lorenz-Mie coefficients
+nc = n_elements(ab[0,*]) - 1    ; number of terms
+
+nx = double(self.dim[0])
+ny = double(self.dim[1])
+npts = nx*ny
+xc = self.rp[0]
+yc = self.rp[1]
+
+; handle deinterlacing
+fac = 1.d
+if (self.deinterlace ne 0) then begin
+   ny = floor(ny/2.) + (ny mod 2) * (self.deinterlace - 1)
+   yc -= self.deinterlace mod 2
+   fac = 2.d
+endif
+
+x = rebin(dindgen(nx) - xc, nx, ny, /sample)
+y = rebin(fac*dindgen(1, ny) - yc, nx, ny, /sample)
+z = self.rp[2]
+
+; convert to spherical coordinates centered on the sphere.
+; (r, theta, phi) is the spherical coordinate of the pixel
+; at (x,y) in the imaging plane at distance z from the
+; center of the sphere.
+rho   = sqrt(x^2 + y^2)
+r     = sqrt(rho^2 + z^2)
+theta = atan(rho, z)
+phi   = atan(y, x)
+costheta = cos(theta)
+sintheta = sin(theta)
+cosphi = cos(phi)
+sinphi = sin(phi)
+
+kr = k*r                        ; reduced radial coordinate
+
+; starting points for recursive function evaluation ...
+; ... Riccati-Bessel radial functions, page 478
+sinkr = sin(kr)
+coskr = cos(kr)
+xi_nm2 = dcomplex(coskr, sinkr) ; \xi_{-1}(kr)
+xi_nm1 = dcomplex(sinkr,-coskr) ; \xi_0(kr)
+
+; ... angular functions (4.47), page 95
+pi_nm1 = 0.d                    ; \pi_0(\cos\theta)
+pi_n   = 1.d                    ; \pi_1(\cos\theta)
+
+; storage for vector spherical harmonics: [r,theta,phi]
+Mo1n = dcomplexarr(3, npts)
+Ne1n = dcomplexarr(3, npts)
+
+; storage for scattered field
+Es = dcomplexarr(3, npts)
+
+; Compute field by summing multipole contributions
+for n = 1.d, nc do begin
+
+; upward recurrences ...
+; ... Legendre factor (4.47)
+; Method described by Wiscombe (1980)
+    swisc = pi_n * costheta
+    twisc = swisc - pi_nm1
+    tau_n = pi_nm1 - n * twisc  ; -\tau_n(\cos\theta)
+
+; ... Riccati-Bessel function, page 478
+    xi_n = (2.d*n - 1.d) * xi_nm1 / kr - xi_nm2    ; \xi_n(kr)
+
+; vector spherical harmonics (4.50)
+;   Mo1n[0,*] = 0.d             ; no radial component
+    Mo1n[1,*] = pi_n * xi_n     ; ... divided by cosphi/kr
+    Mo1n[2,*] = tau_n * xi_n    ; ... divided by sinphi/kr
+
+    dn = (n * xi_n)/kr - xi_nm1
+    Ne1n[0,*] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
+    Ne1n[1,*] = tau_n * dn      ; ... divided by cosphi/kr
+    Ne1n[2,*] = pi_n  * dn      ; ... divided by sinphi/kr
+
+; prefactor, page 93
+    En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
+
+; the scattered field in spherical coordinates (4.45)
+    Es += (En * ci * ab[0,n]) * Ne1n - (En * ab[1,n]) * Mo1n
+
+; upward recurrences ...
+; ... angular functions (4.47)
+; Method described by Wiscombe (1980)
+    pi_nm1 = pi_n
+    pi_n = swisc + ((n + 1.d) / n) * twisc
+
+; ... Riccati-Bessel function
+    xi_nm2 = xi_nm1
+    xi_nm1 = xi_n
+endfor
+
+; geometric factors were divided out of the vector
+; spherical harmonics for accuracy and efficiency ...
+; ... put them back at the end.
+Es[0,*] *= cosphi * sintheta / kr^2
+Es[1,*] *= cosphi / kr
+Es[2,*] *= sinphi / kr
+
+;;; Hologram
+;;;
+;;; I(\vec{r}) = |\hat{x} + \alpha \exp(-i k zp) \vec{E}_s(\vec{r})|^2
+;;;
+; NOTE: Project \hat{x} onto spherical coordinates
+; \hat{x} = \sin\theta \cos\phi \hat{r} 
+;           + \cos\theta \cos\phi \hat{\theta}
+;           - \sin\phi \hat{\phi}
+;
+Es *= self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
+Es[0, *] += sintheta * cosphi
+Es[1, *] += costheta * cosphi
+Es[2, *] -= sinphi
+
+*self.hologram = reform(total(real_part(Es * conj(Es)), 1), nx, ny)
 
 end
 
@@ -511,6 +633,25 @@ if arg_present(mpp) then mpp = self.mpp
 if arg_present(deinterlace) then deinterlace = self.deinterlace
 if arg_present(type) then type = self.type
 
+end
+
+;;;;
+;
+; DGGdhmLMSphere::CPUInit
+;
+; Allocate CPU variables
+;
+function DGGdhmLMSphere::CPUInit
+
+COMPILE_OPT IDL2, HIDDEN
+nx = self.dim[0]
+ny = self.dim[1]
+if (self.deinterlace ne 0) then begin
+   fac = (ny mod 2) * (self.deinterlace - 1)
+   ny =  floor(ny/2.) + fac
+endif
+
+return, 0B
 end
 
 ;;;;
