@@ -52,6 +52,7 @@
 ;        for individual properties using the IDL_Object model.
 ;
 ;    Compute: Compute hologram using present parameters.
+;    ComputeCPU: Compute using CPU rather than GPU.
 ;
 ; REFERENCES:
 ; 1. Adapted from Chapter 4 in
@@ -104,10 +105,12 @@
 ;    corner, rather than center.
 ; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier
 ;    releases.
-; 07/19/2013 DGG Inition version of ComputeCPU.
+; 07/19/2013 DGG Initial version of ComputeCPU.
 ;
 ; NOTES:
-; Implement CPU calculations for systems without GPULib.
+; Allocate CPU storage.
+; Select CPU versus GPU.
+; Refactor to minimize repeated calculations (deinterlace, e.g.)
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; 
