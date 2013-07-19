@@ -105,12 +105,13 @@
 ;    corner, rather than center.
 ; 05/03/2013 DGG Update for GPULib 1.6.0, which fixes bugs in earlier
 ;    releases.
-; 07/19/2013 DGG Initial version of ComputeCPU.
+; 07/19/2013 DGG Initial version of ComputeCPU.  Refactored
+;    deinterlace code.
 ;
 ; NOTES:
 ; Allocate CPU storage.
 ; Select CPU versus GPU.
-; Refactor to minimize repeated calculations (deinterlace, e.g.)
+; Reorder CPU arrays for greater efficiency: [npts,3] rather than [3,npts]
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; 
@@ -135,22 +136,16 @@ ci = dcomplex(0, 1)                                  ; imaginary unit
 ab = *self.ab                   ; Lorenz-Mie coefficients
 nc = n_elements(ab[0,*]) - 1    ; number of terms
 
-nx = double(self.dim[0])
-ny = double(self.dim[1])
-npts = nx*ny
 xc = self.rp[0]
-yc = self.rp[1]
+yc = self.rp[1] - (self.deinterlace mod 2)
 
-; handle deinterlacing
-fac = 1.d
-if (self.deinterlace ne 0) then begin
-   ny = floor(ny/2.) + (ny mod 2) * (self.deinterlace - 1)
-   yc -= self.deinterlace mod 2
-   fac = 2.d
-endif
+nx = self.nx
+ny = self.ny
+npts = nx * ny
+stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
 x = rebin(dindgen(nx) - xc, nx, ny, /sample)
-y = rebin(fac*dindgen(1, ny) - yc, nx, ny, /sample)
+y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
 z = self.rp[2]
 
 ; convert to spherical coordinates centered on the sphere.
@@ -247,7 +242,7 @@ Es[0, *] += sintheta * cosphi
 Es[1, *] += costheta * cosphi
 Es[2, *] -= sinphi
 
-*self.hologram = reform(total(real_part(Es * conj(Es)), 1), nx, ny)
+*self.hologram = reform(total(real_part(Es * conj(Es)), 1), self.nx, self.ny)
 
 end
 
@@ -275,24 +270,19 @@ nc = n_elements(ab[0,*]) - 1    ; number of terms
 
 gpu = *(self.gpu)               ; structure of GPU variables
 
-nx = double(self.dim[0])
-ny = double(self.dim[1])
 xc = self.rp[0]
-yc = self.rp[1]
+yc = self.rp[1] - (self.deinterlace mod 2)
 
 ; handle deinterlacing
-fac = 1.d
-if (self.deinterlace ne 0) then begin
-   ny = floor(ny/2.) + (ny mod 2) * (self.deinterlace - 1)
-   yc -= self.deinterlace mod 2
-   fac = 2.d
-endif
+nx = self.nx
+ny = self.ny
+stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
 gpu.x = gpumake_array(nx, ny, type = self.type, /index)
 gpu.y = gpucopy(gpu.x, LHS = gpu.y)
 gpu.y = gpufloor(1.d, 1.d/nx, gpu.y, 0.d, 0.d, LHS = gpu.y)
 gpu.x = gpuadd(1.d, gpu.x, -nx, gpu.y, -xc, LHS = gpu.x)
-gpu.y = gpuadd(fac, gpu.y, 0.d, gpu.y, -yc, LHS = gpu.y)
+gpu.y = gpuadd(stride, gpu.y, 0.d, gpu.y, -yc, LHS = gpu.y)
 gpu.z = gpuadd(0.d, gpu.x, 0.d, gpu.x, self.rp[2], LHS = gpu.z, /NONBLOCKING)
 
 ; rho = sqrt(x^2 + y^2)
@@ -647,12 +637,6 @@ end
 function DGGdhmLMSphere::CPUInit
 
 COMPILE_OPT IDL2, HIDDEN
-nx = self.dim[0]
-ny = self.dim[1]
-if (self.deinterlace ne 0) then begin
-   fac = (ny mod 2) * (self.deinterlace - 1)
-   ny =  floor(ny/2.) + fac
-endif
 
 return, 0B
 end
@@ -681,12 +665,8 @@ if (self.type eq 9) then $
 ftype = (self.type eq 9) ? 5 : 4            ; double or float
 
 ;;; Allocate GPU memory
-nx = self.dim[0]
-ny = self.dim[1]
-if (self.deinterlace ne 0) then begin
-   fac = (ny mod 2) * (self.deinterlace - 1)
-   ny = floor(ny/2.) + fac
-endif
+nx = self.nx
+ny = self.ny
 
 gpu = {SphereDHM_GPU_Variables, $
        x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
@@ -767,8 +747,14 @@ endelse
 
 self.type = (keyword_set(single)) ? 6 : 9
 
-if isa(deinterlace, /scalar, /number) then $
-   self.deinterlace = 2 - (deinterlace mod 2) ; 1: odd, 2: even
+self.nx = self.dim[0]
+self.ny = self.dim[1]
+if isa(deinterlace, /scalar, /number) then begin
+   if (deinterlace gt 0) then begin
+      self.deinterlace = 2 - (deinterlace mod 2) ; 1: odd, 2: even
+      self.ny = floor(self.ny/2.) + (self.ny mod 2) * (self.deinterlace - 1)
+   endif
+endif
 
 ;;; Initialize GPU
 if ~(self->GPUInit()) then $
@@ -813,15 +799,6 @@ if isa(delta, /scalar, /number) then $
 else $
    self.delta = 0.d
 
-;;; allocate storage for the result
-ny = dim[1]
-if (self.deinterlace ne 0) then begin
-   fac = (ny mod 2) * (self.deinterlace - 1)
-   ny = floor(ny/2.) + fac
-endif
-a = dblarr(dim[0], ny, /nozero)
-self.hologram = ptr_new(a, /no_copy)
-
 ;;; initial Lorenz-Mie coefficients based on inputs
 if isa(ab, /number, /array) then begin
    sz = size(ab)
@@ -833,10 +810,9 @@ endif else $
    ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda)
 self.ab = ptr_new(ab)
 
-;;; safe initial parameters
-;res = (self.type eq 6) ? 1e-3 : 1e-7
-;if (abs(self.rp[0]) + abs(self.rp[1])) mod 1.d lt res then $
-;   self.rp[0] += res
+;;; allocate storage for the result
+a = dblarr(self.nx, self.ny, /nozero)
+self.hologram = ptr_new(a, /no_copy)
 
 self->compute
 
@@ -898,6 +874,8 @@ struct = {DGGdhmLMSphere,            $
           delta:       0.D,          $ ; illumination wavefront distortion
           lambda:      0.D,          $ ; vacuum wavelength [um]
           mpp:         0.D,          $ ; magnification [um/pixel]
+          nx:          0L,           $ ; width of deinterlaced hologram
+          ny:          0L,           $ ; height of deinterlaced hologram
           deinterlace: 0             $ ; 0: none, 1: odd, 2: even
          }
 
