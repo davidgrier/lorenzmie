@@ -52,7 +52,6 @@
 ;        for individual properties using the IDL_Object model.
 ;
 ;    Compute: Compute hologram using present parameters.
-;    ComputeCPU: Compute using CPU rather than GPU.
 ;
 ; REFERENCES:
 ; 1. Adapted from Chapter 4 in
@@ -119,6 +118,47 @@
 ; 
 ; Copyright (c) 2011-2013 David G. Grier
 ;-    
+
+;;;;
+;
+; DGGdhmLMSphere::ComputeGeometryCPU
+;
+; Update geometric factors on CPU
+;
+pro DGGdhmLMSphere::ComputeGeometryCPU
+
+COMPILE_OPT IDL2, HIDDEN
+
+xc = self.rp[0]
+yc = self.rp[1] - (self.deinterlace mod 2)
+
+nx = self.nx
+ny = self.ny
+npts = nx * ny
+stride = (self.deinterlace ne 0) ? 2.d : 1.d
+
+v.x = reform(rebin(dindgen(nx) - xc, nx, ny, /sample), npts)
+v.y = reform(rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample), npts)
+z = self.rp[2]
+
+; convert to spherical coordinates centered on the sphere.
+; (r, theta, phi) is the spherical coordinate of the pixel
+; at (x,y) in the imaging plane at distance z from the
+; center of the sphere.
+v.rho   = sqrt(v.x^2 + v.y^2)
+v.kr    = sqrt(v.rho^2 + z^2)
+v.costheta = z/v.kr
+v.sintheta = v.rho/v.kr
+phi   = atan(v.y, v.x)
+v.cosphi = cos(phi)
+v.sinphi = sin(phi)
+
+v.kr *= k                       ; reduced radial coordinate
+v.sinkr = sin(v.kr)
+v.coskr = cos(v.kr)
+
+end
+
 ;;;;
 ;
 ; DGGdhmLMSphere::ComputeCPU
@@ -161,10 +201,9 @@ z = self.rp[2]
 ; center of the sphere.
 rho   = sqrt(x^2 + y^2)
 r     = sqrt(rho^2 + z^2)
-theta = atan(rho, z)
+costheta = z/r
+sintheta = rho/r
 phi   = atan(y, x)
-costheta = cos(theta)
-sintheta = sin(theta)
 cosphi = cos(phi)
 sinphi = sin(phi)
 
@@ -249,7 +288,6 @@ Es[*, 0] += cosphi * sintheta
 Es[*, 1] += cosphi * costheta
 Es[*, 2] -= sinphi
 
-;*self.hologram = reform(total(real_part(Es * conj(Es)), 1), self.nx, self.ny)
 *self.hologram = reform(total(real_part(Es * conj(Es)), 2), self.nx, self.ny)
 
 status = check_math()
