@@ -108,9 +108,11 @@
 ;    deinterlace code.  Corrected divide-by-zero corner case for GPU.
 ;    Automatically select CPU or GPU calculation.  Reorder CPU arrays
 ;    for greater efficiency: [npts,3] rather than [3,npts].
+; 07/20/2013 DGG Separate CPU geometry calculation.  Preallocate
+;    CPU variables associated with geometry.
 ;
 ; NOTES:
-; Allocate CPU storage?
+; CPU code returns incorrect field (almost never used).
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; Optionally force single precision?
@@ -137,25 +139,29 @@ ny = self.ny
 npts = nx * ny
 stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
-v.x = reform(rebin(dindgen(nx) - xc, nx, ny, /sample), npts)
-v.y = reform(rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample), npts)
-z = self.rp[2]
+v = self.v
+
+(*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
+(*v).x = reform((*v).x, npts, /overwrite)
+(*v).y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
+(*v).y = reform((*v).y, npts, /overwrite)
+z = self.rp[2] > 1.d
 
 ; convert to spherical coordinates centered on the sphere.
 ; (r, theta, phi) is the spherical coordinate of the pixel
 ; at (x,y) in the imaging plane at distance z from the
 ; center of the sphere.
-v.rho   = sqrt(v.x^2 + v.y^2)
-v.kr    = sqrt(v.rho^2 + z^2)
-v.costheta = z/v.kr
-v.sintheta = v.rho/v.kr
-phi   = atan(v.y, v.x)
-v.cosphi = cos(phi)
-v.sinphi = sin(phi)
+(*v).rho   = sqrt((*v).x^2 + (*v).y^2)
+(*v).kr    = sqrt((*v).rho^2 + z^2)
+(*v).costheta = z/(*v).kr
+(*v).sintheta = (*v).rho/(*v).kr
+phi   = atan((*v).y, (*v).x)
+(*v).cosphi = cos(phi)
+(*v).sinphi = sin(phi)
 
-v.kr *= k                       ; reduced radial coordinate
-v.sinkr = sin(v.kr)
-v.coskr = cos(v.kr)
+(*v).kr *= self.k                       ; reduced radial coordinate
+(*v).sinkr = sin((*v).kr)
+(*v).coskr = cos((*v).kr)
 
 end
 
@@ -170,61 +176,33 @@ pro DGGdhmLMSphere::ComputeCPU
 COMPILE_OPT IDL2, HIDDEN
 
 ; turn off math exceptions for floating point underflow errors
-currentexcept = !except
-!except = 0
-void = check_math()
+;currentexcept = !except
+;!except = 0
+;void = check_math()
 
-lambda = self.lambda / real_part(self.nm) / self.mpp ; wavelength [pixels]
-k = 2.d * !dpi / lambda                              ; wavenumber [pixel^-1]
-ci = dcomplex(0, 1)                                  ; imaginary unit
+ci = dcomplex(0, 1)             ; imaginary unit
 
 ab = *self.ab                   ; Lorenz-Mie coefficients
 nc = n_elements(ab[0,*]) - 1    ; number of terms
 
-xc = self.rp[0]
-yc = self.rp[1] - (self.deinterlace mod 2)
+self->computeGeometryCPU
 
-nx = self.nx
-ny = self.ny
-npts = nx * ny
-stride = (self.deinterlace ne 0) ? 2.d : 1.d
-
-x = rebin(dindgen(nx) - xc, nx, ny, /sample)
-y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
-x = reform(x, npts, /overwrite)
-y = reform(y, npts, /overwrite)
-z = self.rp[2]
-
-; convert to spherical coordinates centered on the sphere.
-; (r, theta, phi) is the spherical coordinate of the pixel
-; at (x,y) in the imaging plane at distance z from the
-; center of the sphere.
-rho   = sqrt(x^2 + y^2)
-r     = sqrt(rho^2 + z^2)
-costheta = z/r
-sintheta = rho/r
-phi   = atan(y, x)
-cosphi = cos(phi)
-sinphi = sin(phi)
-
-kr = k*r                        ; reduced radial coordinate
+npts = self.nx * self.ny        ; number of points in hologram
+;v = *(self.v)                   ; preallocated variables
+v = self.v
 
 ; starting points for recursive function evaluation ...
 ; ... Riccati-Bessel radial functions, page 478
-sinkr = sin(kr)
-coskr = cos(kr)
-xi_nm2 = dcomplex(coskr, sinkr) ; \xi_{-1}(kr)
-xi_nm1 = dcomplex(sinkr,-coskr) ; \xi_0(kr)
+xi_nm2 = dcomplex((*v).coskr, (*v).sinkr) ; \xi_{-1}(kr)
+xi_nm1 = dcomplex((*v).sinkr,-(*v).coskr) ; \xi_0(kr)
 
 ; ... angular functions (4.47), page 95
 pi_nm1 = 0.d                    ; \pi_0(\cos\theta)
 pi_n   = 1.d                    ; \pi_1(\cos\theta)
 
-; storage for vector spherical harmonics: [r,theta,phi]
-Mo1n = dcomplexarr(npts, 3)
-Ne1n = dcomplexarr(npts, 3)
-
-; storage for scattered field
+Mo1n = dcomplexarr(npts, 3, /NOZERO)
+Mo1n[*, 0] = dcomplex(0)
+Ne1n = dcomplexarr(npts, 3, /NOZERO)
 Es = dcomplexarr(npts, 3)
 
 ; Compute field by summing multipole contributions
@@ -233,19 +211,19 @@ for n = 1.d, nc do begin
 ; upward recurrences ...
 ; ... Legendre factor (4.47)
 ; Method described by Wiscombe (1980)
-    swisc = pi_n * costheta
+    swisc = pi_n * (*v).costheta
     twisc = swisc - pi_nm1
     tau_n = pi_nm1 - n * twisc  ; -\tau_n(\cos\theta)
 
 ; ... Riccati-Bessel function, page 478
-    xi_n = (2.d*n - 1.d) * xi_nm1 / kr - xi_nm2    ; \xi_n(kr)
+    xi_n = (2.d*n - 1.d) * (xi_nm1 / (*v).kr) - xi_nm2    ; \xi_n(kr)
 
 ; vector spherical harmonics (4.50)
 ;   Mo1n[0, 0] = 0.d             ; no radial component
     Mo1n[0, 1] = pi_n * xi_n     ; ... divided by cosphi/kr
     Mo1n[0, 2] = tau_n * xi_n    ; ... divided by sinphi/kr
 
-    dn = (n * xi_n)/kr - xi_nm1
+    dn = (n * xi_n) / (*v).kr - xi_nm1
     Ne1n[0, 0] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
     Ne1n[0, 1] = tau_n * dn      ; ... divided by cosphi/kr
     Ne1n[0, 2] = pi_n  * dn      ; ... divided by sinphi/kr
@@ -270,9 +248,9 @@ endfor
 ; geometric factors were divided out of the vector
 ; spherical harmonics for accuracy and efficiency ...
 ; ... put them back at the end.
-Es[*, 0] *= cosphi * sintheta / kr^2
-Es[*, 1] *= cosphi / kr
-Es[*, 2] *= sinphi / kr
+Es[*, 0] *= (*v).cosphi * (*v).sintheta / (*v).kr^2
+Es[*, 1] *= (*v).cosphi / (*v).kr
+Es[*, 2] *= (*v).sinphi / (*v).kr
 
 ;;; Hologram
 ;;;
@@ -283,15 +261,15 @@ Es[*, 2] *= sinphi / kr
 ;           + \cos\theta \cos\phi \hat{\theta}
 ;           - \sin\phi \hat{\phi}
 ;
-Es *= self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
-Es[*, 0] += cosphi * sintheta
-Es[*, 1] += cosphi * costheta
-Es[*, 2] -= sinphi
+Es *= self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))
+Es[*, 0] += (*v).cosphi * (*v).sintheta
+Es[*, 1] += (*v).cosphi * (*v).costheta
+Es[*, 2] -= (*v).sinphi
 
 *self.hologram = reform(total(real_part(Es * conj(Es)), 2), self.nx, self.ny)
 
-status = check_math()
-!except = currentexcept                ; restore math error checking
+;status = check_math()
+;!except = currentexcept                ; restore math error checking
 end
 
 ;;;;
@@ -314,9 +292,7 @@ currentexcept = !except
 !except = 0
 void = check_math()
 
-lambda = self.lambda / real_part(self.nm) / self.mpp ; wavelength [pixels]
-k = 2.d * !dpi / lambda                              ; wavenumber [pixel^-1]
-ci = dcomplex(0, 1)                                  ; imaginary unit
+ci = dcomplex(0, 1)             ; imaginary unit
 
 ab = *self.ab                   ; Lorenz-Mie coefficients
 nc = n_elements(ab[0,*]) - 1    ; number of terms
@@ -376,7 +352,7 @@ v.sinphi = gpudiv(v.y, v.rho, LHS = v.sinphi, /NONBLOCKING)
 v.cosphi = gpudiv(v.x, v.rho, LHS = v.cosphi, /NONBLOCKING)
 
 ; scale distances by wavenumber
-v.kr = gpuadd(k, v.kr, 0.d, v.kr, 0.d, LHS = v.kr)
+v.kr = gpuadd(self.k, v.kr, 0.d, v.kr, 0.d, LHS = v.kr)
 
 ; starting points for recursive function evaluation ...
 ; ... Riccati-Bessel radial functions, page 478
@@ -492,7 +468,7 @@ v.Es3 = gpumult(v.Es3, v.z, LHS = v.Es3)
 ;           + \cos\theta \cos\phi \hat{\theta}
 ;           - \sin\phi \hat{\phi}
 ;
-fac = self.alpha * exp(dcomplex(0, -k*(self.rp[2] + self.delta)))
+fac = self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))
 v.x = gpumult(v.sintheta, v.cosphi, LHS = v.x, /NONBLOCKING)
 v.y = gpumult(v.costheta, v.cosphi, LHS = v.y, /NONBLOCKING)
 v.xi[2] = gpuadd(-1., v.sinphi, fac, v.Es3, 0., LHS = v.xi[2])
@@ -616,6 +592,8 @@ if isa(lambda, /scalar, /number) then begin
    newcoeffs = 1B
 endif
 
+self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
+
 ;;; compute new Lorenz-Mie coefficients, if necessary
 if (newcoeffs) then begin
    ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda)
@@ -687,6 +665,33 @@ if arg_present(deinterlace) then deinterlace = self.deinterlace
 if arg_present(type) then type = self.type
 if arg_present(gpu) then gpu = self.gpu
 
+end
+
+;;;;
+;
+; DGGdhmLMSphere:CPUInit
+;
+; Allocate CPU memory
+;
+pro DGGdhmLMSphere::CPUInit
+
+COMPILE_OPT IDL2,  HIDDEN
+
+npts = self.nx * self.ny
+v = {SphereDHM_CPU_Variables, $
+     x: dblarr(npts), $
+     y: dblarr(npts), $
+     rho: dblarr(npts), $
+     kr: dblarr(npts), $
+     costheta: dblarr(npts), $
+     sintheta: dblarr(npts), $
+     cosphi: dblarr(npts), $
+     sinphi: dblarr(npts), $
+     coskr: dblarr(npts), $
+     sinkr: dblarr(npts) $
+    }
+
+self.v = ptr_new(v, /no_copy)
 end
 
 ;;;;
@@ -805,6 +810,7 @@ endif
 
 ;;; Initialize GPU
 self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
+if ~self.gpu then self->CPUInit
 
 ;;; Optional inputs
 if (n_elements(rp) eq 3) then $
@@ -844,6 +850,8 @@ if isa(delta, /scalar, /number) then $
 else $
    self.delta = 0.d
 
+self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
+
 ;;; initial Lorenz-Mie coefficients based on inputs
 if isa(ab, /number, /array) then begin
    sz = size(ab)
@@ -877,21 +885,21 @@ COMPILE_OPT IDL2, HIDDEN
 if ptr_valid(self.hologram) then $
    ptr_free, self.hologram
 
-if self.gpu and ptr_valid(self.v) then begin
-   v = *(self.v)
-   gpufree, [v.x, v.y, v.z]
-   gpufree, [v.rho, v.kr]
-   gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
-   gpufree, v.xi
-   gpufree, v.pi
-   gpufree, [v.Mo1n2, v.Mo1n3, v.Ne1n1, v.Ne1n2, v.Ne1n3]
-   gpufree, [v.Es1, v.Es2, v.Es3]
-   gpufree, v.dn
-   gpufree, v.hologram
-endif
-
-if ptr_valid(self.v) then $
+if ptr_valid(self.v) then begin
+   if self.gpu then begin
+      v = *(self.v)
+      gpufree, [v.x, v.y, v.z]
+      gpufree, [v.rho, v.kr]
+      gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
+      gpufree, v.xi
+      gpufree, v.pi
+      gpufree, [v.Mo1n2, v.Mo1n3, v.Ne1n1, v.Ne1n2, v.Ne1n3]
+      gpufree, [v.Es1, v.Es2, v.Es3]
+      gpufree, v.dn
+      gpufree, v.hologram
+   endif
    ptr_free, self.v
+endif
 
 end
 
@@ -918,11 +926,12 @@ struct = {DGGdhmLMSphere,            $
           nm:          dcomplex(0.), $ ; medium refractive index
           alpha:       0.D,          $ ; relative illumination amplitude
           delta:       0.D,          $ ; illumination wavefront distortion
-          lambda:      0.D,          $ ; vacuum wavelength [um]
           mpp:         0.D,          $ ; magnification [um/pixel]
+          lambda:      0.D,          $ ; vacuum wavelength [um]
+          k:           0.D,          $ ; wavenumber in medium [pixel^-1]
+          deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
           nx:          0L,           $ ; width of deinterlaced hologram
           ny:          0L,           $ ; height of deinterlaced hologram
-          deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
           gpu:         0             $ ; flag: 1 if GPU enabled
          }
 
