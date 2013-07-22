@@ -110,6 +110,8 @@
 ;    for greater efficiency: [npts,3] rather than [3,npts].
 ; 07/20/2013 DGG Separate CPU geometry calculation.  Preallocate
 ;    CPU variables associated with geometry.
+; 07/21/2013 DGG Reorganizing GPU code for reduced memory footprint,
+;    and hopefully for speed after refactoring.
 ;
 ; NOTES:
 ; CPU code returns incorrect field (almost never used).
@@ -376,28 +378,34 @@ v.Es3 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es3, /NONBLOCKING)
 
 ; Compute field by summing multipole contributions
 for n = 1.d, nc do begin
+
+; Field calculation prefactor, page 93
+   En = ci^n * (2.d * n + 1.d) / n / (n + 1.d)
+   an = En * ci * ab[0, n]
+   bn = -En * ab[1, n]
+
 ; upward recurrences ...
+
 ; ... Legendre factor (4.47)
 ; Method described by Wiscombe (1980)
 ;  swisc = \pi_n * \cos\theta
 ;  twisc = swisc - \pi_{n-1}
 ;  tau = n * twisc - \pi_{n-1}
-   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x) ; swisc in x
-   v.y = gpusub(v.x, v.pi[1], LHS = v.y)         ; twisc in y
-   v.z = gpuadd(1.d, v.pi[1], -n, v.y, 0.d, $
-                  LHS = v.z, /NONBLOCKING) ; -tau in z
+   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x, /NONBLOCKING) ; swisc in x
 
 ; ... Riccati-Bessel function, page 478
 ; \xi_n = (2n - 1) xi_{n-1} / kr - xi_{n-2}
    v.xi[0] = gpudiv(v.xi[1], v.kr, LHS = v.xi[0])
    v.xi[0] = gpuadd(2.d*n - 1.d, v.xi[0], -1.d, v.xi[2], 0.d, $
-                      LHS = v.xi[0])
+                      LHS = v.xi[0], /NONBLOCKING)
+
+   v.y = gpusub(v.x, v.pi[1], LHS = v.y)                             ; twisc in y
+   v.z = gpuadd(1.d, v.pi[1], -n, v.y, 0.d, LHS = v.z, /NONBLOCKING) ; -tau in z
 
 ; ... Deirmendjian's derivative
 ; d_n = (n xi_n)/kr - xi_{n-1}
    v.dn = gpudiv(v.xi[0], v.kr, LHS = v.dn)
-   v.dn = gpuadd(n, v.dn, -1.d, v.xi[1], 0.d, $
-                   LHS = v.dn, /NONBLOCKING)
+   v.dn = gpuadd(n, v.dn, -1.d, v.xi[1], 0.d, LHS = v.dn)
 
 ; Vector spherical harmonics (4.50)
 ;  Mo1n[0,*] = 0.d            ; no radial component
@@ -414,25 +422,6 @@ for n = 1.d, nc do begin
    v.Ne1n2 = gpumult(v.z, v.dn, LHS = v.Ne1n2, /NONBLOCKING)
    v.Ne1n3 = gpumult(v.pi[0], v.dn, LHS = v.Ne1n3)
    
-; upward recurrences ...
-; ... angular functions (4.47)
-; Method described by Wiscombe (1980)
-;  pi_{n-1} = pi_n
-;  pi_n = swisc + (n + 1) twisc / n
-   v.pi = shift(v.pi, 1)
-   v.pi[0] = gpuadd(1.d, v.x, (n + 1.d)/n, v.y, 0.d, $
-                      LHS = v.pi[0], /NONBLOCKING)
-
-; ... Riccati-Bessel function
-;  xi_{n-2} = xi_{n-1}
-;  xi_{n-1} = xi_n
-   v.xi = shift(v.xi, 1)
-
-; Field calculation
-; prefactor, page 93
-   En = ci^n * (2.d * n + 1.d) / n / (n + 1.d)
-   an = En * ci * ab[0, n]
-   bn = -En * ab[1, n]
 ; scattered field in spherical coordinates (4.45)
    v.Es1 = gpuadd(1.d, v.Es1, an, v.Ne1n1, 0.d, $
                     LHS = v.Es1, /NONBLOCKING)
@@ -443,6 +432,20 @@ for n = 1.d, nc do begin
                     LHS = v.Es2, /NONBLOCKING)
    v.Es3 = gpuadd(1.d, v.Es3, bn, v.Mo1n3, 0.d, $
                     LHS = v.Es3, /NONBLOCKING)
+
+; upward recurrences ...
+; ... Riccati-Bessel function
+;  xi_{n-2} = xi_{n-1}
+;  xi_{n-1} = xi_n
+   v.xi = shift(v.xi, 1)
+
+; ... angular functions (4.47)
+; Method described by Wiscombe (1980)
+;  pi_{n-1} = pi_n
+;  pi_n = swisc + (n + 1) twisc / n
+   v.pi = shift(v.pi, 1)
+   v.pi[0] = gpuadd(1.d, v.x, (n + 1.d)/n, v.y, 0.d, LHS = v.pi[0], /NONBLOCKING)
+
 endfor
 
 ;;; Scattered field 
