@@ -112,8 +112,11 @@
 ;    CPU variables associated with geometry.
 ; 07/21/2013 DGG Reorganizing GPU code for reduced memory footprint,
 ;    and hopefully for speed after refactoring.
+; 07/22/2013 DGG Single precision is not enough for recurrences.
+;    Default to CPU if GPU cannot handle double precision.
 ;
 ; NOTES:
+; Use low-level GPU routines for speed.
 ; CPU code returns incorrect field (almost never used).
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
@@ -716,8 +719,11 @@ endif
 ;;; Initialize GPU
 gpuinit, /hardware, /quiet
 
-self.type = (gpudoublecapable()) ? 9 : 6 ; dcomplex or complex
-ftype = (self.type eq 9) ? 5 : 4         ; double or float
+if ~gpudoublecapable() then $
+   return, 0B
+
+self.type = 9
+ftype = 4
 
 ;;; Allocate GPU memory
 nx = self.nx
