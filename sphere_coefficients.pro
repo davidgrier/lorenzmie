@@ -70,6 +70,8 @@
 ; 05/31/2011 DGG Fixed corner condition in Nstop code.
 ; 09/04/2011 DGG Added RESOLUTION keyword
 ; 01/26/2013 DGG Calculate x with real part of nm
+; 07/22/2013 DGG RESOLUTION retains up to last coefficient
+;    with sufficiently large magnitude.
 ;
 ; Copyright (c) 2010-2013 F. C. Cheong and D. G. Grier
 ; 
@@ -247,8 +249,9 @@ ab[1, *] /= (Hb[-1, *]*m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)
 ab[*, 0]  = dcomplex(0)
 
 if keyword_set(resolution) then begin
-   w = where(total(abs(ab), 1) gt resolution)
-   ab = ab[*,w]
+   w = where(total(abs(ab), 1) gt resolution, ngood)
+   if ngood ge 1 then $
+     ab = ab[*,0:w[-1]]
 endif
 
 return, ab

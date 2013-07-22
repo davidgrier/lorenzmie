@@ -23,21 +23,24 @@
 ;    LAMBDA:   (RGS) vacuum wavelength of light [um]
 ;    MPP:      (RGS) magnification [um/pixel]
 ;    
-;    RP:       ( GS) [XP, YP, ZP] position of the center of the sphere 
-;                    relative to the center of the image in the focal
-;                    plane. [pixel]
-;    XP:       ( GS) x-coordinate of the sphere's center [pixel]
-;    YP:       ( GS) y-coordinate of the sphere's center [pixel]
-;    ZP:       ( GS) z-coordinate of the sphere's center [pixel]
-;    AP:       ( GS) radius of sphere [um]
-;    NP:       ( GS) complex refractive index of sphere
-;    NM:       ( GS) complex refractive index of medium
-;    ALPHA:    ( GS) relative amplitude of illumination
-;    DELTA:    ( GS) wavefront distortion [pixel]
+;    RP:         ( GS) [XP, YP, ZP] position of the center of the sphere 
+;                      relative to the center of the image in the focal
+;                      plane. [pixel]
+;    XP:         ( GS) x-coordinate of the sphere's center [pixel]
+;    YP:         ( GS) y-coordinate of the sphere's center [pixel]
+;    ZP:         ( GS) z-coordinate of the sphere's center [pixel]
+;    AP:         ( GS) radius of sphere [um]
+;    NP:         ( GS) complex refractive index of sphere
+;    NM:         ( GS) complex refractive index of medium
+;    ALPHA:      ( GS) relative amplitude of illumination
+;    DELTA:      ( GS) wavefront distortion [pixel]
 ; 
-;    HOLOGRAM: ( G ) real-valued computed holographic image
-;    FIELD:    ( G ) complex-valued scattered field
-;    AB:       ( GS) Lorenz-Mie scattering coefficients
+;    HOLOGRAM:   ( G ) real-valued computed holographic image
+;    FIELD:      ( G ) complex-valued scattered field
+;    AB:         ( GS) Lorenz-Mie scattering coefficients
+;    RESOLUTION: ( GS) Resolution of Lorenz-Mie coefficients.
+;                      0: Full resolution
+;                      1e-5: No noticable loss of quality.
 ;
 ; KEYWORDS:
 ;    DEINTERLACE: (Initialization)
@@ -114,6 +117,7 @@
 ;    and hopefully for speed after refactoring.
 ; 07/22/2013 DGG Single precision is not enough for recurrences.
 ;    Default to CPU if GPU cannot handle double precision.
+;    Optionally limit resolution of Lorenz-Mie coefficients.
 ;
 ; NOTES:
 ; Use low-level GPU routines for speed.
@@ -515,6 +519,7 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
                                  kp = kp, $
                                  nm = nm, $
                                  km = km, $
+                                 resolution =  resolution, $
                                  alpha = alpha, $
                                  delta = delta, $
                                  lambda = lambda, $
@@ -593,6 +598,11 @@ if isa(km, /scalar, /number) then begin
    newcoeffs = 1B
 endif
 
+if isa(resolution, /scalar, /number) then begin
+   self.resolution = double(resolution)
+   newcoeffs = 1B
+endif
+
 if isa(lambda, /scalar, /number) then begin
    self.lambda = double(lambda)
    newcoeffs = 1B
@@ -602,7 +612,7 @@ self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
 
 ;;; compute new Lorenz-Mie coefficients, if necessary
 if (newcoeffs) then begin
-   ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda)
+   ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, resolution = self.resolution)
    self.ab = ptr_new(ab, /no_copy)
 endif
 
@@ -621,6 +631,7 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  field = field, $
                                  dim = dim, $
                                  ab = ab, $
+                                 resolution = resolution, $
                                  xp = xp, $
                                  yp = yp, $
                                  zp = zp, $
@@ -650,8 +661,8 @@ if arg_present(field) then begin
    field[2,*,*] = gpugetarr((*self.v).Es3, LHS = field[2,*,*])
 endif
 
-if arg_present(ab) then $
-   ab = *(self.ab)
+if arg_present(ab) then ab = *(self.ab)
+if arg_present(resolution) then resolution = self.resolution
 
 if arg_present(dim) then dim = self.dim
 if arg_present(rp) then rp = self.rp
@@ -776,6 +787,7 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                ap = ap,         $ ; sphere radius [um]
                                np = np,         $ ; sphere refractive index
                                nm = nm,         $ ; medium refractive index
+                               resolution = resolution, $ ; resolution for Lorenz-Mie coefficients
                                alpha = alpha,   $ ; relative illumination amplitude
                                delta = delta,   $ ; illumination wavefront distortion
                                deinterlace = deinterlace, $
@@ -861,15 +873,9 @@ else $
 
 self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
 
-;;; initial Lorenz-Mie coefficients based on inputs
-if isa(ab, /number, /array) then begin
-   sz = size(ab)
-   if (sz[0] ne 2) or (sz[1] ne 2)  then begin
-      message, 'AB: scattering coefficients must be a [2,n] array', /inf
-      return, 0B
-   endif
-endif else $
-   ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda)
+self.resolution = isa(resolution, /scalar, /number) ? double(resolution) : 0
+
+ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, resolution = self.resolution)
 self.ab = ptr_new(ab)
 
 ;;; allocate storage for the result
@@ -927,6 +933,7 @@ struct = {DGGdhmLMSphere,            $
           hologram:    ptr_new(),    $ ; computed hologram
           dim:         [0L, 0L],     $ ; dimensions of hologram
           ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
+          resolution:  0.D,          $ ; resolution to 
           v:           ptr_new(),    $ ; structure of preallocated variables
           type:        0,            $ ; data type (double if possible)
           rp:          dblarr(3),    $ ; 3D position [pixel]
