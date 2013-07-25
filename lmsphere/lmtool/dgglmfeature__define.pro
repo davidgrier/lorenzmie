@@ -46,6 +46,7 @@
 ;
 ; MODIFICATION HISTORY:
 ; 01/27/2013 Written by David G. Grier, New York University
+; 07/24/2013 DGG Update call to RS1D.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -156,7 +157,7 @@ z = dindgen(50) * 4.d + 10.d ; NOTE: set range more intelligently
 lambda = self.parent.lambda
 mpp = self.parent.mpp
 nm = real_part(self.parent.nm)
-res = rs1d(*(self.data), z, self.rp[0:1] - self.r0, lambda = lambda/nm, mpp = mpp)
+res = rs1d(*(self.data), z, self.rp[0:1] - self.r0, lambda, mpp)
 m = max(abs(res), loc)
 self.rp[2] = z[loc]
 end
