@@ -40,6 +40,7 @@
 ; 01/29/2013 Written by David G. Grier, New York University
 ; 02/03/2013 DGG Initial versions of save procedures.  Increase range of
 ;   ZP to 300 pixels.
+; 07/24/2013 DGG Use GPU acceleration.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -486,7 +487,8 @@ if n_params() ne 3 then begin
    return
 endif
 
-h = dgglmhologram(a, lambda, mpp, nm = nm, deinterlace = deinterlace, smooth = smooth)
+h = dgglmhologram(a, lambda, mpp, nm = nm, $
+                  deinterlace = deinterlace, smooth = smooth, /gpu)
 if ~isa(h, 'DGGlmHologram') then begin
    message, umsg, /inf
    message, 'could not initialize', /inf
