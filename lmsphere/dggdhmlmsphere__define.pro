@@ -19,9 +19,9 @@
 ;          G = Get
 ;          S = Set
 ;
-;    DIM:      (RG ) [nx, ny] dimensions of hologram [pixels].
-;    LAMBDA:   (RGS) vacuum wavelength of light [um]
-;    MPP:      (RGS) magnification [um/pixel]
+;    DIM:        (RG ) [nx, ny] dimensions of hologram [pixels].
+;    LAMBDA:     (RGS) vacuum wavelength of light [um]
+;    MPP:        (RGS) magnification [um/pixel]
 ;    
 ;    RP:         ( GS) [XP, YP, ZP] position of the center of the sphere 
 ;                      relative to the center of the image in the focal
@@ -118,6 +118,7 @@
 ; 07/22/2013 DGG Single precision is not enough for recurrences.
 ;    Default to CPU if GPU cannot handle double precision.
 ;    Optionally limit resolution of Lorenz-Mie coefficients.
+; 07/24/2013 DGG Anonymous data structures allow for resizing.
 ;
 ; NOTES:
 ; Use low-level GPU routines for speed.
@@ -695,8 +696,7 @@ pro DGGdhmLMSphere::CPUInit
 COMPILE_OPT IDL2,  HIDDEN
 
 npts = self.nx * self.ny
-v = {SphereDHM_CPU_Variables, $
-     x: dblarr(npts), $
+v = {x: dblarr(npts), $
      y: dblarr(npts), $
      rho: dblarr(npts), $
      kr: dblarr(npts), $
@@ -740,8 +740,7 @@ ftype = 4
 nx = self.nx
 ny = self.ny
 
-v = {SphereDHM_GPU_Variables, $
-     x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
+v = {x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      y:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      z:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      rho:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
