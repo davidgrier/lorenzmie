@@ -119,10 +119,10 @@
 ;    Default to CPU if GPU cannot handle double precision.
 ;    Optionally limit resolution of Lorenz-Mie coefficients.
 ; 07/24/2013 DGG Anonymous data structures allow for resizing.
+; 07/25/2013 DGG CPU code returns correct fields.
 ;
 ; NOTES:
 ; Use low-level GPU routines for speed.
-; CPU code returns incorrect field (almost never used).
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; Optionally force single precision?
@@ -228,12 +228,14 @@ for n = 1.d, nc do begin
 ; ... Riccati-Bessel function, page 478
     xi_n = (2.d*n - 1.d) * (xi_nm1 / (*v).kr) - xi_nm2    ; \xi_n(kr)
 
+; ... Deirmendjian's derivative
+    dn = (n * xi_n) / (*v).kr - xi_nm1
+
 ; vector spherical harmonics (4.50)
-;   Mo1n[0, 0] = 0.d             ; no radial component
+;   Mo1n[*, 0] = dcomplex(0.d)   ; no radial component
     Mo1n[0, 1] = pi_n * xi_n     ; ... divided by cosphi/kr
     Mo1n[0, 2] = tau_n * xi_n    ; ... divided by sinphi/kr
 
-    dn = (n * xi_n) / (*v).kr - xi_nm1
     Ne1n[0, 0] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
     Ne1n[0, 1] = tau_n * dn      ; ... divided by cosphi/kr
     Ne1n[0, 2] = pi_n  * dn      ; ... divided by sinphi/kr
@@ -242,7 +244,8 @@ for n = 1.d, nc do begin
     En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
 
 ; the scattered field in spherical coordinates (4.45)
-    Es += (En * ci * ab[0,n]) * Ne1n - (En * ab[1,n]) * Mo1n
+    Es += (En * ci * ab[0, n]) * Ne1n
+    Es -= (En * ab[1, n]) * Mo1n
 
 ; upward recurrences ...
 ; ... angular functions (4.47)
@@ -271,12 +274,12 @@ Es[*, 2] *= (*v).sinphi / (*v).kr
 ;           + \cos\theta \cos\phi \hat{\theta}
 ;           - \sin\phi \hat{\phi}
 ;
-Es *= self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))
-Es[*, 0] += (*v).cosphi * (*v).sintheta
-Es[*, 1] += (*v).cosphi * (*v).costheta
-Es[*, 2] -= (*v).sinphi
+Ne1n = (self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))) * Es
+Ne1n[*, 0] += (*v).cosphi * (*v).sintheta
+Ne1n[*, 1] += (*v).cosphi * (*v).costheta
+Ne1n[*, 2] -= (*v).sinphi
 
-*self.hologram = reform(total(real_part(Es * conj(Es)), 2), self.nx, self.ny)
+*self.hologram = reform(total(real_part(Ne1n * conj(Ne1n)), 2), self.nx, self.ny)
 
 ;status = check_math()
 ;!except = currentexcept                ; restore math error checking
@@ -656,10 +659,13 @@ if arg_present(hologram) then $
    hologram = *(self.hologram)
 
 if arg_present(field) then begin
-   field = dcomplexarr(3, self.dim[0], self.dim[1], /nozero)
-   field[0,*,*] = gpugetarr((*self.v).Es1, LHS = field[0,*,*])
-   field[1,*,*] = gpugetarr((*self.v).Es2, LHS = field[1,*,*])
-   field[2,*,*] = gpugetarr((*self.v).Es3, LHS = field[2,*,*])
+   if self.gpu then begin
+      field = dcomplexarr(3, self.dim[0], self.dim[1], /nozero)
+      field[0,*,*] = gpugetarr((*self.v).Es1, LHS = field[0,*,*])
+      field[1,*,*] = gpugetarr((*self.v).Es2, LHS = field[1,*,*])
+      field[2,*,*] = gpugetarr((*self.v).Es3, LHS = field[2,*,*])
+   endif else $
+      field = *((*self.v).Es)
 endif
 
 if arg_present(ab) then ab = *(self.ab)
