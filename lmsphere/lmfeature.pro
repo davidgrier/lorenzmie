@@ -42,6 +42,12 @@
 ;    maxrefits: Maxmimum number of refits due to large displacements.
 ;        Default: 1
 ;
+;    resolution: Resolution to which Lorenz-Mie coefficients are to be
+;        computed.  Should be a value between 0 and 1.
+;        Default: 0 -- retain full resolution.
+;        Setting resolution = 1e-5 speeds up computations enormously,
+;        without appreciably influencing results.
+;
 ; KEYWORD FLAGS:
 ;    deinterlace: If set to an even number, consider only even
 ;        lines in feature extraction.  Similarly, if set to an
@@ -147,6 +153,7 @@
 ; 06/04/2013 DGG Added COUNT keyword.  Estiamte per-pixel errors for
 ;   two-dimensional fit.
 ; 07/19/2013 DGG Update for CPU object implementation.
+; 07/25/2013 DGG Added RESOLUTION keyword.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -193,6 +200,7 @@ function lmfeature, a, lambda, mpp, $
                     fixdelta = fixdelta, $
                     roi = roi, $
                     residuals = residuals, $
+                    resolution = resolution, $
                     gpu = gpu, $
                     deinterlace = deinterlace, $
                     graphics = graphics, $
@@ -400,6 +408,7 @@ refit:
                              fixalpha = fixalpha, $
                              fixdelta = fixdelta || peggedalpha, $
                              deinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0, $
+                             resolution = resolution, $
                              gpu = gpu, $
                              quiet = quiet)
 

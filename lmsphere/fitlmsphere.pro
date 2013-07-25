@@ -53,6 +53,12 @@
 ;    nplimits: [minnp, maxnp] limits on np
 ;      Default: [1.01, 3.] relative to nm
 ;
+;    resolution: Set resolution to which Lorenz-Mie coefficients
+;      should be calculated.
+;      Default: 0 -- retain full resolution.
+;      Setting resolution = 1e-5 speeds the calculation substantially
+;      without appreciably influencing results.
+;
 ; KEYWORD FLAGS:
 ;    deinterlace: Only fit to odd (DEINTERLACE = 1) 
 ;      or even (DEINTERLACE = 2) scan lines.  This is useful for analyzing
@@ -165,6 +171,7 @@
 ;    keyword.  Overhaul sampling code when called with deinterlace.
 ; 07/19/2013 DGG object now handles CPU code.  Use object throughout.
 ;    Remove OBJECT keyword.
+; 07/24/2013 DGG Added RESOLUTION keyword.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -211,6 +218,7 @@ function fitlmsphere, a, $                     ; image
                       fixalpha = fixalpha, $   ; fix illumination amplitude
                       fixdelta = fixdelta, $   ; fix wavefront distortion
                       deinterlace = deinterlace, $
+                      resolution = resolution, $
                       gpu = gpu, $             ; use GPU acceleration
                       quiet = quiet            ; don't print diagnostics
 
@@ -329,6 +337,7 @@ obj = DGGdhmLMSphere(dim = [nx, ny], $
                      alpha = p0[8], $
                      delta = p0[9], $
                      deinterlace = deinterlace, $
+                     resolution = resolution, $
                      gpu = gpu $
                     )
 
