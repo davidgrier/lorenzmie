@@ -399,6 +399,8 @@ refit:
    ;; 2D fit to refine estimates
    p2 = [rc-r0, reform(p1[0, *])]  ; initial parameters from 1D fit
 
+   thisfixdelta = fixdelta or pegged alpha
+   thisdeinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0
    thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
                              errors = err, $
                              chisq = thischisq, $
@@ -406,8 +408,8 @@ refit:
                              fixap = fixap, $
                              fixnp = fixnp, $
                              fixalpha = fixalpha, $
-                             fixdelta = fixdelta || peggedalpha, $
-                             deinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0, $
+                             fixdelta = thisfixdelta, $
+                             deinterlace = thisdeinterlace, $
                              resolution = resolution, $
                              gpu = gpu, $
                              quiet = quiet)

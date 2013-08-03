@@ -402,7 +402,7 @@ for n = 1.d, nc do begin
 ;  swisc = \pi_n * \cos\theta
 ;  twisc = swisc - \pi_{n-1}
 ;  tau = n * twisc - \pi_{n-1}
-   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x, /NONBLOCKING) ; swisc in x
+   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x, /NONBLOCKING) ;   swisc in x
 
 ; ... Riccati-Bessel function, page 478
 ; \xi_n = (2n - 1) xi_{n-1} / kr - xi_{n-2}
