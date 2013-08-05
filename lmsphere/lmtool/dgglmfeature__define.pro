@@ -47,6 +47,7 @@
 ; MODIFICATION HISTORY:
 ; 01/27/2013 Written by David G. Grier, New York University
 ; 07/24/2013 DGG Update call to RS1D.  Use GPU by default.
+; 08/05/2013 DGG Support all flags for fitlmsphere.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -56,7 +57,10 @@
 ;
 pro DGGlmFeature::Fit, fixap = fixap, $
                        fixnp = fixnp, $
+                       fixkp = fixkp, $
                        fixzp = fixzp, $
+                       fixnm = fixnm, $
+                       fixkm = fixkm, $
                        fixalpha = fixalpha, $
                        fixdelta = fixdelta, $
                        chisq = chisq, $
@@ -64,10 +68,18 @@ pro DGGlmFeature::Fit, fixap = fixap, $
 
 COMPILE_OPT IDL2, HIDDEN
 
-p0 = [self.rp - self.r0, self.ap, real_part(self.np), imaginary(self.np), $
+rc = self.rp - self.r0
+p0 = [rc, self.ap, real_part(self.np), imaginary(self.np), $
       real_part(self.parent.nm), imaginary(self.parent.nm), self.alpha, self.delta]
+aa = aziavg(*(self.data), center = rc, deviates = dev, $
+            deinterlace = self.parent.deinterlace)
+err = abs(dev)/self.parent.noise > 1.
+print, max(err), min(err)
+
 p1 = fitlmsphere(*(self.data), p0, self.parent.lambda, self.parent.mpp, $
-                 fixap = fixap, fixnp = fixnp, $
+                 errors = err, $
+                 fixap = fixap, fixnp = fixnp, fixkp = fixkp, $
+                 fixzp = fixzp, fixnm = fixnm, fixkm = fixkm, $
                  fixalpha = fixalpha, fixdelta = fixdelta, $
                  deinterlace = self.parent.deinterlace, $
                  chisq = chisq, $

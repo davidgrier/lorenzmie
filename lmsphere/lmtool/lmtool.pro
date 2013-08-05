@@ -56,23 +56,12 @@ COMPILE_OPT IDL2, HIDDEN
 
 widget_control, ev.top, get_uvalue = s
 widget_control, /hourglass
-h = (*s).p.h
+h = (*s).p.h                      ; the hologram
 f = h -> get(position = (*s).p.n) ; selected feature
-fix = (*s).p.fix
-p0 = [f.rp-f.r0, f.ap, $
-      real_part(f.np), imaginary(f.np), $
-      real_part(h.nm), imaginary(h.nm), $
-      f.alpha, f.delta]
-p1 = fitlmsphere(f.data, p0, h.lambda, h.mpp, $
-                 fixap = fix.ap, fixnp = fix.np, fixkp = fix.kp, $
-                 fixzp = fix.zp, fixnm = fix.nm, fixkm = fix.km, $
-                 fixalpha = fix.alpha, fixdelta = fix.delta, $
-                 deinterlace = h.deinterlace, /gpu)
-f.rp = p1[0, 0:2] + f.r0
-f.ap = p1[0, 3]
-f.np = dcomplex(p1[0, 4], p1[0, 5])
-f.alpha = p1[0, 8]
-f.delta = p1[0, 9]
+fix = (*s).p.fix                  ; fixed parameters
+f.fit, fixap = fix.ap, fixnp = fix.np, fixkp = fix.kp, $
+       fixzp = fix.zp, fixnm = fix.nm, fixkm = fix.km, $
+       fixalpha = fix.alpha, fixdelta = fix.delta
 lmt_update_fit_plot, s
 lmt_update_parameter_widgets, s
 lmt_update_profile_plot, s
