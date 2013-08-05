@@ -67,7 +67,7 @@ p1 = fitlmsphere(f.data, p0, h.lambda, h.mpp, $
                  fixap = fix.ap, fixnp = fix.np, fixkp = fix.kp, $
                  fixzp = fix.zp, fixnm = fix.nm, fixkm = fix.km, $
                  fixalpha = fix.alpha, fixdelta = fix.delta, $
-                 deinterlace = h.deinterlace)
+                 deinterlace = h.deinterlace, /gpu)
 f.rp = p1[0, 0:2] + f.r0
 f.ap = p1[0, 3]
 f.np = dcomplex(p1[0, 4], p1[0, 5])
