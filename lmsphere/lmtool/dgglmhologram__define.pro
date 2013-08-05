@@ -74,7 +74,7 @@ rp = ctfeature(a, noise = self.noise, deinterlace = self.deinterlace, $
                count = nfeatures, /quiet)
 
 if nfeatures gt 0 then begin
-   rad = ct_range(a, rp, noise = self.noise, deinterlace = self.deinterlace)
+   rad = fringe_range(a, rp, nfringes = self.nfringes, deinterlace = self.deinterlace)
    for n = 0, nfeatures-1 do $
       self.add, dgglmfeature(parent = self, rp = rp[*, n], rad = rad[n])
 endif
@@ -90,6 +90,7 @@ pro DGGlmHologram::Setproperty, data = data, $
                                 mpp = mpp, $
                                 nm = nm, $
                                 noise = noise, $
+                                nfringes = nfringes, $
                                 deinterlace = deinterlace
 
 COMPILE_OPT IDL2, HIDDEN
@@ -121,6 +122,16 @@ if isa(nm, /scalar, /number) then $
 if isa(noise, /scalar, /number) then $
    self.noise = noise
 
+if isa(nfringes, /scalar, /number) then begin
+   self.nfringes = fix(nfringes)
+   features = self.get(/all, count = nfeatures)
+   for n = 0, nfeatures-1 do begin
+      feature = features[n]
+      feature.rad = fringe_range(*(self.data), feature.rp, $
+                                 nfringes = self.nfringes, deinterlace = self.deinterlace)
+   endfor
+endif
+
 if n_elements(deinterlace) eq 1 then $
    self.deinterlace = deinterlace
 
@@ -135,6 +146,7 @@ pro DGGlmHologram::GetProperty, data = data, $
                                 mpp = mpp, $
                                 nm = nm, $
                                 noise = noise, $
+                                nfringes = nfringes, $
                                 deinterlace = deinterlace
 
 COMPILE_OPT IDL2, HIDDEN
@@ -145,6 +157,7 @@ if arg_present(lambda) then lambda = self.lambda
 if arg_present(mpp) then mpp = self.mpp
 if arg_present(nm) then nm = self.nm
 if arg_present(noise) then noise = self.noise
+if arg_present(nfringes) then nfringes = self.nfringes
 if arg_present(deinterlace) then deinterlace = self.deinterlace
 end
 
@@ -159,6 +172,7 @@ function DGGlmHologram::Init, data, $
                               mpp, $
                               nm = nm, $
                               noise = noise, $
+                              nfringes = nfringes, $
                               deinterlace = deinterlace, $
                               smooth = smooth
 
@@ -214,6 +228,8 @@ if isa(noise, /scalar, /number) then $
 else $
    self.noise = mad(*(self.data))
 
+self.nfringes = isa(nfringes, /scalar, /number) ? fix(nfringes) : 20
+
 self.nm = isa(nm, /scalar, /number) ? dcomplex(nm) : refractiveindex(self.lambda, 24.)
 
 if keyword_set(deinterlace) then $
@@ -263,6 +279,7 @@ struct = {DGGlmHologram,          $
           mpp: 0.d,               $ ; magnification [micrometer/pixel]
           nm: dcomplex(0),        $ ; refractive index of medium
           noise: 0.,              $ ; estimated pixel noise
+          nfringes: 0,            $ ; number of fringes to fit
           deinterlace: 0          $
          }
 end

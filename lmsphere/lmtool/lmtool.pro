@@ -41,6 +41,7 @@
 ; 02/03/2013 DGG Initial versions of save procedures.  Increase range of
 ;   ZP to 300 pixels.
 ; 07/24/2013 DGG Use GPU acceleration.
+; 08/05/2013 DGG Set radius with fringe number.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -228,6 +229,14 @@ case uval of
    'MPP' : h.mpp = val
    'DEINTERLACE' : lmt_deinterlace, s, val
    'FIX' : lmt_update_fix_flags, s, val
+   'NFRINGES' : begin
+      h.nfringes = val
+      foreach feature, (*s).w.f do $
+         feature.update
+      ((*s).w.f)[(*s).p.n].update, /selected
+      lmt_update_profile_plot, s
+      lmt_update_parameter_widgets, s
+   end
    'RAD' : begin
       f.rad = val
       ((*s).w.f)[(*s).p.n].update, /selected
@@ -340,6 +349,8 @@ void = cw_bgroup(wimaging, ['none', 'odd', 'even'], label_top = 'deinterlace', $
 void = cw_field(wimaging, title = 'nm', uvalue = 'NM', value = real_part(p.h.nm), $
                 /column, /return_events, /floating, /tab_mode)
 void = cw_field(wimaging, title = 'km', uvalue = 'KM', value = imaginary(p.h.nm), $
+                /column, /return_events, /floating, /tab_mode)
+void = cw_field(wimaging, title = 'nfringes', uvalue = 'NFRINGES', value = p.h.nfringes, $
                 /column, /return_events, /floating, /tab_mode)
 
 ; profile tab

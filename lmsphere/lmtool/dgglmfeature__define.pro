@@ -213,8 +213,8 @@ endif
 if isa(zp, /number, /scalar) then $
    self.rp[2] = zp
 
-if isa(rad, /number, /scalar) then begin
-   self.rad = rad
+if isa(rad, /number) then begin
+   self.rad = long(rad[0])
    docrop = 1
 endif
 
@@ -317,7 +317,7 @@ endif
 if isa(zp, /number, /scalar) then $
    rp[2] = zp
 
-self.rad = isa(rad, /number, /scalar) ? rad : 100
+self.rad = isa(rad, /number, /scalar) ? long(rad) : 100L
 self.np = isa(np, /number, /scalar) ? dcomplex(np) : dcomplex(1.5)
 self.ap = isa(ap, /number, /scalar) ? double(ap) : 1.d
 self.alpha = isa(alpha, /number, /scalar) ? double(alpha) : 1.d
@@ -359,7 +359,7 @@ struct = {DGGlmFeature,        $
           data: ptr_new(),     $ ; cropped image
           dim: [0, 0],         $ ; dimensions of cropped image
           rp: dblarr(3),       $ ; position of feature in hologram [pixel]
-          rad: 0.d,            $ ; range around position to crop [pixel]
+          rad: 0L,             $ ; range around position to crop [pixel]
           ap: 0.d,             $ ; radius of sphere [micrometers]
           np: dcomplex(0),     $ ; refractive index of sphere
           alpha: 1.,           $ ; relative amplitude of illumination
