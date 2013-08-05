@@ -303,7 +303,7 @@ refit:
    rn = extrema(aa, ismin = ismin)                        ; coordinates of maxima and minima
 
    ;;; region of interest
-   n = nfringes < n_elements(rn) - 1 ; range set by fringe number.
+   n = nfringes < (n_elements(rn) - 1) ; range set by fringe number.
    range = rn[n]                
    xc = rc[0]
    yc = rc[1]
