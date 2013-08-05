@@ -299,7 +299,6 @@ for ndx = 0L, nfeatures - 1 do begin
 refit:
 
    aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal average
-   aa[0:1] = aa[2]                                        ; FIXME: problem with aziavg?
    rn = extrema(aa, ismin = ismin)                        ; coordinates of maxima and minima
 
    ;;; region of interest
