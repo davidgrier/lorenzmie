@@ -41,7 +41,8 @@ pro LMTFeature::Update, selected = selected
 feature = self.feature
 r0 = feature.r0
 rad = feature.rad
-r1 = r0 + 2*rad + 1
+r1 = r0 + feature.dim - 1
+
 self.poly -> setdata, [r0[0], r1[0], r1[0], r0[0], r0[0]], $
                       [r0[1], r0[1], r1[1], r1[1], r0[1]]
 self.poly.color =  keyword_set(selected) ? 'light green' : 'green'
@@ -85,7 +86,7 @@ self.feature = feature
 
 r0 = feature.r0
 rad = feature.rad
-r1 = r0 + 2*rad + 1
+r1 = r0 + feature.dim - 1
 self.poly = polygon([[r0[0], r1[0], r1[0], r0[0], r0[0]], $
                      [r0[1], r0[1], r1[1], r1[1], r0[1]]], $
                     target = parent, /data, fill_transparency = 90, $
