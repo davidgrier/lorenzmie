@@ -260,9 +260,24 @@ doreport = ~keyword_set(quiet)
 dographics = arg_present(graphics) || keyword_set(graphics)
 quiet = ~keyword_set(debug)
 
+if isa(graphics, 'lmfgraphics') then $
+   graphics.im -> putdata, deinterlace(a, deinterlace) $
+else begin
+   im = image(deinterlace(a, deinterlace), axis_style = 2)
+   pf = plot([0], [0], over = im, $
+             linestyle = '', symbol = 'o', color = 'red')
+   graphics = {lmfgraphics, im:im, pf:pf}
+endelse
+   
 ;;; Find candidate features
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
                pickn = pickn, count = nfeatures)
+
+if nfeatures le 0 then $
+   return, features
+
+if dographics then $
+   graphics.pf -> putdata, rp[0, *], rp[1, *]
 
 if doreport then begin
    print
@@ -270,18 +285,6 @@ if doreport then begin
    if keyword_set(deinterlace) then $
       message, 'analyzing ' + ((deinterlace mod 2) ? 'odd' : 'even') + ' field', /inf
    message, 'features found: ' + strtrim(nfeatures, 2), /inf
-endif
-
-if dographics then begin
-   if isa(graphics, 'lmfgraphics') then begin
-      graphics.im -> putdata, deinterlace(a, deinterlace)
-      graphics.pf -> putdata, rp[0, *], rp[1, *]
-   endif else begin
-      im = image(deinterlace(a, deinterlace), axis_style = 2)
-      pf = plot(rp[0,*], rp[1,*], over = im, $
-                linestyle = '', symbol = 'o', color = 'red')
-      graphics = {lmfgraphics, im:im, pf:pf}
-   endelse
 endif
 
 if ~isa(nfringes, /scalar, /number) then nfringes = 20
@@ -299,7 +302,8 @@ for ndx = 0L, nfeatures - 1 do begin
 refit:
 
    aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal average
-   rn = extrema(aa, ismin = ismin)                        ; coordinates of maxima and minima
+   rn = extrema(aa, ismin = ismin, count = count) ; coordinates of maxima and minima
+   if count le 0 then continue
 
    ;;; region of interest
    n = nfringes < (n_elements(rn) - 1) ; range set by fringe number.
@@ -398,7 +402,7 @@ refit:
    ;; 2D fit to refine estimates
    p2 = [rc-r0, reform(p1[0, *])]  ; initial parameters from 1D fit
 
-   thisfixdelta = fixdelta or pegged alpha
+   thisfixdelta = fixdelta or peggedalpha
    thisdeinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0
    thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
                              errors = err, $

@@ -44,6 +44,8 @@
 ;    DGGlmFeature::Fit
 ;    DGGlmFeature::FitProfile
 ;
+; NOTES: Use same estimation algorithms as LMFEATURE
+;
 ; MODIFICATION HISTORY:
 ; 01/27/2013 Written by David G. Grier, New York University
 ; 07/24/2013 DGG Update call to RS1D.  Use GPU by default.
@@ -165,7 +167,7 @@ pro DGGlmFeature::EstimateZ
 
 COMPILE_OPT IDL2, HIDDEN
 
-z = dindgen(50) * 4.d + 10.d ; NOTE: set range more intelligently
+z = dindgen(50) * 4.d + 10.d ; FIXME: set range more intelligently
 lambda = self.parent.lambda
 mpp = self.parent.mpp
 nm = real_part(self.parent.nm)
@@ -178,6 +180,8 @@ end
 ;
 ; DGGlmFeature::Crop
 ;
+; FIXME: update deinterlace for odd/even crop
+;
 pro DGGlmFeature::Crop
 
 COMPILE_OPT IDL2, HIDDEN
@@ -189,7 +193,8 @@ x1 = (self.rp[0] + self.rad) < (self.parent.dim)[0] - 1.d
 y0 = (self.rp[1] - self.rad) > 0.d
 y1 = (self.rp[1] + self.rad) < (self.parent.dim)[1] - 1.d
 
-self.data = ptr_new((self.parent.data)[x0:x1, y0:y1])
+data = (self.parent.data)[x0:x1, y0:y1]
+self.data = ptr_new(data, /no_copy)
 
 self.r0 = [x0, y0, 0.d]             ; lower-left corner of cropped image
 self.dim = [x1, y1] - self.r0 + 1.d ; dimensions of cropped image
