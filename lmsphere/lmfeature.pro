@@ -339,7 +339,7 @@ refit:
       qsq = -lap[w]/(aa[w] - 1.)
       zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
       w = where(zsq gt 0., ngood)
-      if ngood lt 1 then begin
+      if ngood lt 2 then begin
          message, 'could not estimate zp -- skipping this feature', /inf
          continue
       endif
