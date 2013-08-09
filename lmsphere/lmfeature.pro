@@ -258,16 +258,18 @@ fixdelta = keyword_set(fixdelta)
 gpu = keyword_set(gpu)
 doreport = ~keyword_set(quiet)
 dographics = arg_present(graphics) || keyword_set(graphics)
-quiet = ~keyword_set(debug)
+if dographics then begin
+   if isa(graphics, 'lmfgraphics') then $
+      graphics.im -> putdata, deinterlace(a, deinterlace) $
+   else begin
+      im = image(deinterlace(a, deinterlace), axis_style = 2)
+      pf = plot([0], [0], over = im, $
+                linestyle = '', symbol = 'o', color = 'red')
+      graphics = {lmfgraphics, im:im, pf:pf}
+   endelse
+endif
 
-if isa(graphics, 'lmfgraphics') then $
-   graphics.im -> putdata, deinterlace(a, deinterlace) $
-else begin
-   im = image(deinterlace(a, deinterlace), axis_style = 2)
-   pf = plot([0], [0], over = im, $
-             linestyle = '', symbol = 'o', color = 'red')
-   graphics = {lmfgraphics, im:im, pf:pf}
-endelse
+quiet = ~keyword_set(debug)
    
 ;;; Find candidate features
 rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
