@@ -304,11 +304,11 @@ for ndx = 0L, nfeatures - 1 do begin
 refit:
 
    aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal average
-   rn = extrema(aa, ismin = ismin, count = count) ; coordinates of maxima and minima
-   if count le 0 then continue
+   rn = extrema(aa, ismin = ismin, count = nfr) ; coordinates of maxima and minima
+   if nfr le 0 then continue
 
    ;;; region of interest
-   n = nfringes < (n_elements(rn) - 1) ; range set by fringe number.
+   n = nfringes < (nfr - 1) ; range set by fringe number.
    range = rn[n]                
    xc = rc[0]
    yc = rc[1]
