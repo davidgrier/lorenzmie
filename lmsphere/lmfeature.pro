@@ -154,6 +154,8 @@
 ;   two-dimensional fit.
 ; 07/19/2013 DGG Update for CPU object implementation.
 ; 07/25/2013 DGG Added RESOLUTION keyword.
+; 08/09/2013 DGG Return array rather than LIST() for compatibility
+;   with IDL_IDLBridge.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -303,12 +305,12 @@ for ndx = 0L, nfeatures - 1 do begin
    dorefit = 0
 refit:
 
-   aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev) ; azimuthal average
-   rn = extrema(aa, ismin = ismin, count = nfr) ; coordinates of maxima and minima
-   if nfr le 0 then continue
+   aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev)
+   rn = extrema(aa, ismin = ismin, count = nfound) ; coordinates of maxima and minima
+   if nfound le 1 then continue
 
    ;;; region of interest
-   n = nfringes < (nfr - 1) ; range set by fringe number.
+   n = nfringes < (nfound - 1)     ; range set by fringe number.
    range = rn[n]                
    xc = rc[0]
    yc = rc[1]
@@ -457,5 +459,5 @@ refit:
    count++
 endfor
 
-return, features
+return, features.toarray()
 end
