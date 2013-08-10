@@ -42,6 +42,7 @@
 ;   ZP to 300 pixels.
 ; 07/24/2013 DGG Use GPU acceleration.
 ; 08/05/2013 DGG Set radius with fringe number.
+; 08/10/2013 DGG Added RESIDUALS tab.
 ;
 ; Copyright (c) 2013 David G. Grier
 ;-
@@ -63,6 +64,7 @@ f.fit, fixap = fix.ap, fixnp = fix.np, fixkp = fix.kp, $
        fixzp = fix.zp, fixnm = fix.nm, fixkm = fix.km, $
        fixalpha = fix.alpha, fixdelta = fix.delta
 lmt_update_fit_plot, s
+lmt_update_res_plot, s
 lmt_update_parameter_widgets, s
 lmt_update_profile_plot, s
 widget_control, hourglass = 0
@@ -87,6 +89,7 @@ foreach obj, objlist do begin
       lmt_update_parameter_widgets, s
       lmt_update_profile_plot, s
       lmt_update_fit_plot, s
+      lmt_update_res_plot, s
       break
    endif
 endforeach
@@ -133,6 +136,19 @@ end
 
 ;;;;;
 ;
+; LMT_UPDATE_RES_PLOT
+;
+pro lmt_update_res_plot, s
+
+COMPILE_OPT IDL2, HIDDEN
+
+h = (*s).p.h
+f = h.get(position = (*s).p.n) ; selected feature
+(*s).w.imres -> setdata, deinterlace(f.data, h.deinterlace)-f.lmhologram
+end
+
+;;;;;
+;
 ; LMT_UPDATE_PROFILE_PLOT
 ;
 pro lmt_update_profile_plot, s
@@ -170,6 +186,7 @@ h.deinterlace = deinterlace
 (*s).w.im -> putdata, deinterlace(h.data, h.deinterlace)
 lmt_update_profile_plot, s
 lmt_update_fit_plot, s
+lmt_update_res_plot, s
 
 end
 
@@ -286,7 +303,13 @@ case tag_names(ev, /structure_name) of
                       scr_xsize = xy[0], scr_ysize = xy[1]
    end
 
-   'WIDGET_TAB': if ev.tab eq 2 then lmt_update_fit_plot, s
+   'WIDGET_TAB': begin
+      case ev.tab of 
+         2: lmt_update_fit_plot, s
+         3: lmt_update_res_plot, s
+         else:
+      endcase
+   end
       
    else: help, ev                      ; do nothing
 endcase
@@ -378,10 +401,14 @@ void = cw_bgroup(wfitting, ['ap', 'zp', 'np', 'kp', 'alpha', 'delta', 'nm', 'km'
                               p.fix.alpha, p.fix.delta, p.fix.nm, p.fix.km])
 void = widget_button(wfitting, value = '  Fit  ', event_pro = 'lmt_fit', /no_release)
 
-widget_control, base, /realize
+; residual tab
+wrestab = widget_base(wtab, title = 'Residuals', /column)
+wresdraw = widget_window(wrestab, uname = 'RESDRAW')
 
-;;; object references to draw objects are available only after being
-;;; realized
+;;; object references to draw objects are available only after
+;;; the base widget is realized
+
+widget_control, base, /realize
 
 ;;; Hologram
 widget_control, wimagedraw, get_value = wimage
@@ -425,6 +452,11 @@ imfit = image(f.lmhologram, layout = [2, 1, 2], $
 ax = imfit.axes
 ax[1].hide = 1
 
+;;; Residuals
+widget_control, wresdraw, get_value = wres
+wres.select
+imres = image(f.data-f.lmhologram, axis_style = 2, /current)
+
 ;;; cache padding between the base and the draw
 widget_control, base, tlb_get_size = basesize
 pad = basesize[0:1] - [640, 512]
@@ -435,6 +467,7 @@ w = {lmt_widgets, $
      im: im, $
      imhologram: imhologram, $
      imfit: imfit, $
+     imres: imres, $
      f: flist, $
      pplot: pplot, $
      ppoly: ppoly, $
