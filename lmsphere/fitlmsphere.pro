@@ -172,6 +172,7 @@
 ; 07/19/2013 DGG object now handles CPU code.  Use object throughout.
 ;    Remove OBJECT keyword.
 ; 07/24/2013 DGG Added RESOLUTION keyword.
+; 08/11/2013 DGG Simplify test for failed fit.
 ;
 ; Copyright (c) 2007-2013, David G. Grier, Fook Chiong Cheong and
 ;    Paige Hasebe.
@@ -354,16 +355,9 @@ p = mpfitfun('lmsphere_f', obj, aa, err, p0, $
              yfit = yfit, best_resid = residuals)
 residuals = reform(residuals, nx, n_elements(residuals)/nx)
 
-if status le 0 then begin 
-   message, errmsg, /inf
+; failure
+if status le 0 then $
    return, -1
-endif
-
-; failure?
-if n_elements(p) eq 1 then begin
-   message, 'MPFIT2DFUN did not return a result',  /inf
-   return, -1
-endif
 
 ; success
 ; rescale fit uncertainties into error estimates
