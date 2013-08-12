@@ -208,9 +208,9 @@ end
 
 ;;;;;
 ;
-; DGGlmFeature::Setproperty
+; DGGlmFeature::SetProperty
 ;
-pro DGGlmFeature::Setproperty, parent = parent, $
+pro DGGlmFeature::SetProperty, parent = parent, $
                                rp = rp, $
                                rad = rad, $
                                zp = zp, $
@@ -258,9 +258,9 @@ end
 
 ;;;;;
 ;
-; DGGlmFeature::Getproperty
+; DGGlmFeature::GetProperty
 ;
-pro DGGlmFeature::Getproperty, parent = parent, $
+pro DGGlmFeature::GetProperty, parent = parent, $
                                data = data, $
                                dim = dim, $
                                r0 = r0, $
