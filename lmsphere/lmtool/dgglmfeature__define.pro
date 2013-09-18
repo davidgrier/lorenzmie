@@ -77,7 +77,9 @@ p0 = [rc, self.ap, real_part(self.np), imaginary(self.np), $
 aa = aziavg(*(self.data), center = rc, deviates = dev, $
             deinterlace = self.parent.deinterlace)
 err = abs(dev)/self.parent.noise > 1.
-print, max(err), min(err)
+
+;tvscl, *(self.data)
+;tvscl, err, 2.*self.rad, 0
 
 p1 = fitlmsphere(*(self.data), p0, self.parent.lambda, self.parent.mpp, $
                  errors = err, $

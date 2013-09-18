@@ -325,10 +325,17 @@ refit:
       proi = plot(poly, over = graphics.im, linestyle = '--', color = 'light green')
    endif
 
-   ;;; cropped image
-   ac = a[x0:x1, y0:y1]
-   dev = dev[x0:x1, y0:y1]
+   ;;; cropped and deinterlaced iamge
    aa = aa[0:range]
+   if keyword_set(deinterlace) then begin
+      ac = a[x0:x1, y0:y1:2]
+      n0 = ((y0 + deinterlace) mod 2) ? ceil(y0/2) : floor(y0/2)
+      n1 = ((y1 + deinterlace) mod 2) ? floor((y1 - 1)/2) : ceil((y1 - 1)/2)
+      dev = dev[x0:x1, n0:n1]
+   endif else begin
+      ac = a[x0:x1, y0:y1]
+      dev = dev[x0:x1, y0:y1]
+   endelse
 
    ;;; significance estimate within ROI
    err = abs(dev)/noise > 1.

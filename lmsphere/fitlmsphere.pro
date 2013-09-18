@@ -265,15 +265,13 @@ npts = nx*ny
 aa = double(a)
 err = isa(errors, /number) ? double(errors) : 1.D
 
-y0 = 0
-dy = 1
-if keyword_set(deinterlace) then begin
-   y0 = deinterlace mod 2
-   dy = 2
-   aa = a[*, y0:*:2]
-   if isa(err, /array) then $
-      err = err[*, y0:*:2]
-endif
+;y0 = 0
+;if keyword_set(deinterlace) then begin
+;   y0 = deinterlace mod 2
+;   aa = a[*, y0:*:2]
+;   if isa(err, /array) then $
+;      err = err[*, y0:*:2]
+;endif
 
 ;;; Constraints on fitting parameters
 nparams = n_elements(p0)
