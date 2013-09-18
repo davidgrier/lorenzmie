@@ -62,7 +62,10 @@
 ; KEYWORD FLAGS:
 ;    deinterlace: Only fit to odd (DEINTERLACE = 1) 
 ;      or even (DEINTERLACE = 2) scan lines.  This is useful for analyzing
-;      holograms acquired with interlaced cameras.
+;      holograms acquired with interlaced cameras.  Input hologram and
+;      optional error estimates are assumed to be deinterlaced.  Setting this
+;      keyword then ensures that the y coordinates are scaled and
+;      offset appropriately.
 ;
 ;    fixap: If set, do not allow ap to vary.
 ;    fixnp: If set, do not allow np to vary.
@@ -264,14 +267,6 @@ npts = nx*ny
 
 aa = double(a)
 err = isa(errors, /number) ? double(errors) : 1.D
-
-;y0 = 0
-;if keyword_set(deinterlace) then begin
-;   y0 = deinterlace mod 2
-;   aa = a[*, y0:*:2]
-;   if isa(err, /array) then $
-;      err = err[*, y0:*:2]
-;endif
 
 ;;; Constraints on fitting parameters
 nparams = n_elements(p0)
