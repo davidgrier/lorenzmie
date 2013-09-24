@@ -156,6 +156,7 @@
 ; 07/25/2013 DGG Added RESOLUTION keyword.
 ; 08/09/2013 DGG Return array rather than LIST() for compatibility
 ;   with IDL_IDLBridge.
+; 09/24/2013 DGG Use provided ap to estimate zp.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
 ;-
@@ -330,7 +331,7 @@ refit:
    if keyword_set(deinterlace) then begin
       ac = a[x0:x1, y0:y1:2]
       n0 = ((y0 + deinterlace) mod 2) ? ceil(y0/2) : floor(y0/2)
-      n1 = ((y1 + deinterlace) mod 2) ? floor((y1 - 1)/2) : ceil((y1 - 1)/2)
+      n1 = n0 + n_elements(ac[0, *]) - 1
       dev = dev[x0:x1, n0:n1]
    endif else begin
       ac = a[x0:x1, y0:y1]
@@ -343,19 +344,22 @@ refit:
    ;; Use radial profile to estimate axial position, zp,
    ;; David Ruffner's method based on spherical wave model.
    if dozp then begin
-      rho = findgen(range) + 0.5
-      lap = deriv(aa)           ; Laplacian of azimuthal profile
-      lap = deriv(lap) + lap/rho
-      w = where(abs(aa-1.) gt 1e-2)
-      qsq = -lap[w]/(aa[w] - 1.)
-      zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
-      w = where(zsq gt 0., ngood)
-      if ngood lt 2 then begin
-         message, 'could not estimate zp -- skipping this feature', /inf
-         continue
-      endif
-      sigmatrim, zsq[w], mzsq
-      zp = sqrt(mzsq)           ; estimated axial position [pixel]
+      if doap then begin
+         rho = findgen(range) + 0.5
+         lap = deriv(aa)        ; Laplacian of azimuthal profile
+         lap = deriv(lap) + lap/rho
+         w = where(abs(aa-1.) gt 1e-2)
+         qsq = -lap[w]/(aa[w] - 1.)
+         zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
+         w = where(zsq gt 0., ngood)
+         if ngood lt 2 then begin
+            message, 'could not estimate zp -- skipping this feature', /inf
+            continue
+         endif
+         sigmatrim, zsq[w], mzsq
+         zp = sqrt(mzsq)        ; estimated axial position [pixel]
+      endif else $
+         zp = 1.1*ap*(4.*k)/median(j1n/rn[where(ismin)])
    endif
 
    ;; Model observed interference pattern as Poisson's spot to
