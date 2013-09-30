@@ -157,8 +157,10 @@
 ; 08/09/2013 DGG Return array rather than LIST() for compatibility
 ;   with IDL_IDLBridge.
 ; 09/24/2013 DGG Use provided ap to estimate zp.
+; 09/30/2013 DGG and Bhaskar Jyoti Krishnatreya: J0(x) estimate for ap.
 ;
-; Copyright (c) 2008-2013 David G. Grier, David Ruffner and Fook Chiong Cheong
+; Copyright (c) 2008-2013 David G. Grier, Bhaskar Jyoti Krishnatreya,
+;    David Ruffner and Fook Chiong Cheong
 ;-
 ;;;;;
 ;
@@ -253,7 +255,8 @@ k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
 
 dozp = 1                                          ; estimate axial position of each feature
 doap = ~isa(ap, /number, /scalar)                 ; estimate radius of each feature
-j1n = [3.8317, 7.0156, 10.1735, 13.3237, 16.4706] ; zeros of J1(x) used for estimating ap
+j0n = [2.4048, 5.5201, 8.6537, 11.7915, 14.9309] ; zeros of J0(x) used for estimating ap
+;j1n = [3.8317, 7.0156, 10.1735, 13.3237, 16.4706] ; zeros of J1(x) used for estimating ap
 
 fixalpha = keyword_set(fixalpha)
 fixdelta = keyword_set(fixdelta)
@@ -359,13 +362,13 @@ refit:
          sigmatrim, zsq[w], mzsq
          zp = sqrt(mzsq)        ; estimated axial position [pixel]
       endif else $
-         zp = 1.1*ap*(4.*k)/median(j1n/rn[where(ismin)])
+         zp = ap*(4.*k)/median(j0n/rn[where(ismin)])
    endif
 
    ;; Model observed interference pattern as Poisson's spot to
    ;; obtain radius, ap, from axial position, zp
    if doap then $
-      ap = 0.9*zp/(4.*k)*median(j1n/rn[where(ismin)])
+      ap = zp/(4.*k)*median(j0n/rn[where(ismin)])
 
    ;; Estimate np: FIXME: currently uses input value: np0
 
