@@ -446,8 +446,7 @@ refit:
    ;;    or large discrepancy in estimated size.
    ;;    Accept new center and refit -- only do this once
    thisfeature[0, 0:1] += r0    ; center in original image
-   if (max(abs(rc - thisfeature[0, 0:1])) gt 0.6) or $
-      (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
+   if (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
       if dorefit++ lt maxrefits then begin
          rc = reform(thisfeature[0, 0:1])
          message, 'large displacement -- refitting', /inf
