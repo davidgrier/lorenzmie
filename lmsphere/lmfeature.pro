@@ -310,8 +310,14 @@ for ndx = 0L, nfeatures - 1 do begin
 refit:
 
    aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev)
+
+   ;;; analyze radial profile
    rn = extrema(aa, ismin = ismin, count = nfound) ; coordinates of maxima and minima
+   if nfound le 1 then continue                    ; flatline: nothing here
+   w = where(rn gt 2, nfound)                      ; ignore noise near center
    if nfound le 1 then continue
+   rn = rn[w]
+   ismin = ismin[w]
 
    ;;; region of interest
    n = nfringes < (nfound - 1)     ; range set by fringe number.
