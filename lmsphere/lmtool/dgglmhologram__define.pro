@@ -83,9 +83,9 @@ end
 
 ;;;;;
 ;
-; DGGlmHologram::Setproperty
+; DGGlmHologram::SetProperty
 ;
-pro DGGlmHologram::Setproperty, data = data, $
+pro DGGlmHologram::SetProperty, data = data, $
                                 lambda = lambda, $
                                 mpp = mpp, $
                                 nm = nm, $
