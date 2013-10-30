@@ -309,7 +309,7 @@ for ndx = 0L, nfeatures - 1 do begin
    dorefit = 0
 refit:
 
-   aa = aziavg(a, center = rc, deinterlace = deinterlace, deviates = dev)
+   aa = azimedian(a, center = rc, deinterlace = deinterlace, deviates = dev)
 
    ;;; analyze radial profile
    rn = extrema(aa, ismin = ismin, count = nfound) ; coordinates of maxima and minima
