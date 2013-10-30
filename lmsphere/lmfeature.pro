@@ -390,7 +390,8 @@ refit:
 
    ;; Improve estimates by fitting to radial profile
    p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
-                      fixap = fixap, fixnp = fixnp, fixdelta = fixdelta, $
+                      fixap = fixap, fixnp = fixnp, $
+                      fixalpha = fixalpha, fixdelta = fixdelta, $
                       chisq = thischisq, /quiet)
    if ~finite(thischisq) then begin
       message, 'parameter estimate failed -- trying again with fixed delta', /inf, $
