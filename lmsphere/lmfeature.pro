@@ -86,9 +86,10 @@
 ;    count: number of features actually returned
 ;      
 ; PROCEDURE:
-;   CT_FEATURE identifies candidate features using CIRCLETRANSFORM.
-;   CT_RANGE estimates range around each feature.
-;   RS1D estimates zp.
+;   CT2FEATURE identifies and locates candidate features.
+;   Region of interest determined by cropping to fixed number
+;   of fringes around each center.
+;   Spherical wave analysis yields estimate for zp.
 ;   Poisson-spot model estimates ap and improves zp.
 ;   FITSPHERELM1D refines estimate for zp, ap and np.
 ;   FITSPHERELM yields final estimates for parameters.
@@ -157,7 +158,9 @@
 ; 08/09/2013 DGG Return array rather than LIST() for compatibility
 ;   with IDL_IDLBridge.
 ; 09/24/2013 DGG Use provided ap to estimate zp.
-; 09/30/2013 DGG and Bhaskar Jyoti Krishnatreya: J0(x) estimate for ap.
+; 09/30/2013 DGG and Bhaskar Jyoti Krishnatreya: J0(x) estimate for
+; ap.
+; 12/12/2013 DGG Updated for new version of ctfeature.
 ;
 ; Copyright (c) 2008-2013 David G. Grier, Bhaskar Jyoti Krishnatreya,
 ;    David Ruffner and Fook Chiong Cheong
@@ -251,6 +254,9 @@ if ~isa(np0, /number, /scalar) then $
 if ~isa(nm0, /number, /scalar) then $
    nm0 = refractiveindex(lambda, 24.)
 
+if ~isa(noise, /number, /scalar) then $
+   noise = mad(a)
+
 k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
 
 dozp = 1                                          ; estimate axial position of each feature
@@ -262,6 +268,7 @@ fixalpha = keyword_set(fixalpha)
 fixdelta = keyword_set(fixdelta)
 
 gpu = keyword_set(gpu)
+
 doreport = ~keyword_set(quiet)
 dographics = arg_present(graphics) || keyword_set(graphics)
 if dographics then begin
@@ -278,8 +285,7 @@ endif
 quiet = ~keyword_set(debug)
    
 ;;; Find candidate features
-rp = ctfeature(a, noise = noise, deinterlace = deinterlace, $
-               pickn = pickn, count = nfeatures)
+rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
 
 if nfeatures le 0 then $
    return, features
