@@ -278,7 +278,10 @@ parinfo = replicate({limited: [0, 0], $
 ;; Particle position
 ; xp, yp: 
 parinfo[0:1].step = 1d-4 ; overly small steps sometimes prevent convergence
+if keyword_set(deinterlace) then $
+   parinfo[1] *= 2.
 ; zp: 
+parinfo[2].step = 1d-4
 parinfo[2].fixed = keyword_set(fixzp)
 
 ;; Particle properties
