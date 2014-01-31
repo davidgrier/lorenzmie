@@ -142,7 +142,7 @@ pro DGGdhmLMSphere::ComputeGeometryCPU
 COMPILE_OPT IDL2, HIDDEN
 
 xc = self.rp[0]
-yc = self.rp[1] - (self.deinterlace mod 2)
+yc = self.rp[1]
 
 nx = self.nx
 ny = self.ny
@@ -153,7 +153,7 @@ v = self.v
 
 (*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
 (*v).x = reform((*v).x, npts, /overwrite)
-(*v).y = rebin(stride*dindgen(1, ny) - yc, nx, ny, /sample)
+(*v).y = rebin(stride*dindgen(1, ny) + ((self.deinterlace mod 2) - yc), nx, ny, /sample)
 (*v).y = reform((*v).y, npts, /overwrite)
 z = self.rp[2] > 1.d
 
