@@ -27,6 +27,9 @@
 ;        Default: Process all features
 ;
 ;    Parameters for 3D feature location and characterization:
+;    rp: [2,npts] array of initial position estimates
+;        Default: estimated from image with ctfeature().
+;
 ;    ap: ballpark radius of sphere [micrometers]
 ;        Default: estimated from image
 ;
@@ -161,8 +164,9 @@
 ; 09/30/2013 DGG and Bhaskar Jyoti Krishnatreya: J0(x) estimate for
 ; ap.
 ; 12/12/2013 DGG Updated for new version of ctfeature.
+; 04/24/2014 DGG Specify RP as an option.
 ;
-; Copyright (c) 2008-2013 David G. Grier, Bhaskar Jyoti Krishnatreya,
+; Copyright (c) 2008-2014 David G. Grier, Bhaskar Jyoti Krishnatreya,
 ;    David Ruffner and Fook Chiong Cheong
 ;-
 ;;;;;
@@ -199,6 +203,7 @@ function lmfeature, a, lambda, mpp, $
                     nfringes = nfringes, $
                     pickn = pickn, $
                     count = count, $
+                    rp = rp, $
                     ap = ap, $
                     fixap = fixap, $
                     np = np0, $
@@ -285,7 +290,8 @@ endif
 quiet = ~keyword_set(debug)
    
 ;;; Find candidate features
-rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
+if ~isa(rp, /number, /array) then $
+   rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
 
 if nfeatures le 0 then $
    return, features
