@@ -51,8 +51,9 @@
 ; 07/24/2013 DGG Update call to RS1D.  Use GPU by default.
 ; 08/05/2013 DGG Support all flags for fitlmsphere.
 ; 08/11/2013 DGG Handle failed fits more gracefully.
+; 04/23/2014 DGG Do not use GPU by default.
 ;
-; Copyright (c) 2013 David G. Grier
+; Copyright (c) 2013-2014 David G. Grier
 ;-
 ;;;;;
 ;
@@ -88,7 +89,7 @@ p1 = fitlmsphere(*(self.data), p0, self.parent.lambda, self.parent.mpp, $
                  fixalpha = fixalpha, fixdelta = fixdelta, $
                  deinterlace = self.parent.deinterlace, $
                  chisq = chisq, $
-                 /gpu, quiet = quiet)
+                 quiet = quiet)
 
 if n_elements(p1) eq 1 then $   ; fit failed
    return

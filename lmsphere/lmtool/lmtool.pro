@@ -32,10 +32,6 @@
 ; PROCEDURE:
 ;    Uses lmtool procedures and functions to analyze in-line hologram.
 ;
-; NOTES:
-;    View residuals
-;    Implement and test GPU
-;
 ; MODIFICATION HISTORY:
 ; 01/29/2013 Written by David G. Grier, New York University
 ; 02/03/2013 DGG Initial versions of save procedures.  Increase range of
