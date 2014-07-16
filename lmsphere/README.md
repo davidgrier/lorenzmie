@@ -25,5 +25,6 @@ of spheres to predictions of Lorenz-Mie theory.
 * **fitlmsphere1d**: Fits radial profile of normalized hologram
 to prediction of Lorenz-Mie theory.
 
-* **SVRfeature**: Object that automatically analyzed normalized
-holograms using Support Vector Regression.
+* **SVRfeature**: Object that automatically identifies and analyzes
+normalized holograms of colloidal spheres using Support Vector
+ Regression to apply Lorenz-Mie theory.
