@@ -688,7 +688,7 @@ if (error ne 0L) then begin
    return, 0B
 endif
 
-self.pickle = pyimport('pickle')
+self.pickle = pyimport('cPickle')
 self.svm = pyimport('sklearn.svm')
 
 ok = isa(self.pickle, 'pythonobject') && isa(self.svm, 'pythonobject')
@@ -750,7 +750,7 @@ COMPILE_OPT IDL2
 struct = {SVRfeature, $
           INHERITS IDL_OBJECT, $
           svm:     obj_new(),  $ ; python SVM class
-          pickle:  obj_new(),  $ ; python pickle class
+          pickle:  obj_new(),  $ ; serializer for saving SVM objects
           rad:     0L,         $ ; radius for azimuthal average
           lambda:  0.,         $ ; wavelength [micrometers]
           mpp:     0.,         $ ; magnification [micrometers/pixel]
