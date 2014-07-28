@@ -239,7 +239,7 @@ message, 'Computing profiles ...', /inf, noprint = noprint
 if ~noprint then tic
 profiles = fltarr(self.rad+1, nsets, /nozero)
 for i = 0, nsets-1 do $
-   profiles[*, i] = lmsphereprofile(findgen(self.rad+1), zp[i], ap[i], np[i], $
+   profiles[*, i] = lmsphereprofile(findgen(self.rad+1) + 0.5, zp[i], ap[i], np[i], $
                                     self.nm, 1., 0.,  self.lambda, self.mpp)
 if ~noprint then toc
 
