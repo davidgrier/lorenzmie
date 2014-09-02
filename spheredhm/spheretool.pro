@@ -453,7 +453,9 @@ CASE uval of
                  (*s).p.alpha, (*s).p.delta]
           if (*s).p.fixed[6] then begin
              plotimage, bytscl(deinterlace(ac, /odd)), /iso
-             pout = fitspheredhm(ac, pin, (*s).p.lambda, (*s).p.mpp, $
+             pout = fitspheredhm(ac, pin, $
+                                 lambda = (*s).p.lambda, $
+                                 mpp = (*s).p.mpp, $
                                  deinterlace = y0, $
                                  fixap = (*s).p.fixed[0], $
                                  fixzp = (*s).p.fixed[1], $
@@ -463,7 +465,9 @@ CASE uval of
                                  gpu = (*s).p.gpu)
           endif else begin
              plotimage, bytscl(ac), /iso
-             pout = fitspheredhm(ac, pin, (*s).p.lambda, (*s).p.mpp, $
+             pout = fitspheredhm(ac, pin, $
+                                 lambda = (*s).p.lambda, $
+                                 mpp = (*s).p.mpp, $
                                  fixap = (*s).p.fixed[0], $
                                  fixzp = (*s).p.fixed[1], $
                                  fixnp = (*s).p.fixed[2], $
