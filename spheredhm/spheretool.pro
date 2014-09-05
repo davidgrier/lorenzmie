@@ -537,6 +537,7 @@ ENDCASE
 ; Show updated region of interest
 WIDGET_CONTROL, (*s).w.wimage, GET_VALUE = ndx
 wset, ndx
+dev = !d.name
 set_plot, 'z'
 plotimage, bytscl((*s).p.a, top=253), /iso
 rc = (*s).p.rc
@@ -548,7 +549,7 @@ y1 = round(rc[1] + rad) < sz[1]-1
 plots, rc[0], rc[1], psym=circ()
 plots, [x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0], linestyle = 3, color = 254
 image = tvrd()
-set_plot, 'x'
+set_plot, dev
 tv, image
 
 ; show update DHM profile
@@ -565,7 +566,7 @@ oplot, (*s).p.aa + (*s).p.daa, linestyle=2
 oplot, (*s).p.aa - (*s).p.daa, linestyle=2
 oplot, rho, b, color = 254
 image = tvrd()
-set_plot, 'x'
+set_plot, dev
 tv, image
 
 WIDGET_CONTROL, ev.TOP, SET_UVALUE = s
