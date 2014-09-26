@@ -461,22 +461,23 @@ refit:
       if dographics then proi.delete
       continue
    endif
+
+   thisfeature[0, 0:1] += r0    ; center in original image
    ;; 2. Center shifted by more than half a pixel in plane
    ;;    or large discrepancy in estimated size.
    ;;    Accept new center and refit -- only do this once
-   thisfeature[0, 0:1] += r0    ; center in original image
-   if (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
-      if dorefit++ lt maxrefits then begin
-         rc = reform(thisfeature[0, 0:1])
-         message, 'large displacement -- refitting', /inf
-         if dographics then begin
-            rp[0:1, ndx] = rc
-            graphics.pf -> putdata, rp[0, *], rp[1, *]
-            proi.delete
-         endif
-         goto, refit
-      endif
-   endif
+   ;if (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
+   ;   if dorefit++ lt maxrefits then begin
+   ;      rc = reform(thisfeature[0, 0:1])
+   ;      message, 'large displacement -- refitting', /inf
+   ;      if dographics then begin
+   ;         rp[0:1, ndx] = rc
+   ;         graphics.pf -> putdata, rp[0, *], rp[1, *]
+   ;         proi.delete
+   ;      endif
+   ;      goto, refit
+   ;   endif
+   ;endif
 
    if doreport then lmf_report, 'chisq: ' + string(thischisq), thisfeature[0, *]
 
