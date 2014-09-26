@@ -80,8 +80,8 @@
 ;    p[0:1, 7]: [km, dkm] : extinction coefficient of medium
 ;    p[0:1, 8]: [alpha, dalpha] : relative illumination amplitude
 ;    p[0:1, 9]: [delta, ddelta] : wavefront distortion
-;    p[0,  10]: range of region of interest
-;    p[1,  10]: chi-squared value of fit
+;    p[0,  10]: chi-squared value of fit
+;    p[1,  10]: range of region of interest
 ;
 ; KEYWORD OUTPUTS:
 ;    residuals: Residuals of best fit.
