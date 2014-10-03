@@ -86,8 +86,9 @@
 ; 03/06/2013 DGG Implementation of stratified spheres.  Added FIELD
 ;    keyword.
 ; 03/22/2013 DGG rebin(/sample) is more efficient.
+; 10/03/2014 DGG simplify field calculation
 ;
-; Copyright (c) 2007-2013 David G. Grier
+; Copyright (c) 2007-2014 David G. Grier
 ;-
 
 function lmsphere, rp, ap, np, nm, lambda, mpp, dim, $
@@ -184,11 +185,9 @@ if ~isa(alpha, /number, /scalar) then $
 if ~isa(delta, /number, /scalar) then $
    delta = 0.d
 
-fac = alpha * exp(dcomplex(0., -k*(zp + delta)))
-
-field *= fac
-field[0,*] += 1.d
-a = total(real_part(field * conj(field)), 1)
+field *= alpha * exp(dcomplex(0., -k*(zp + delta))) ; scattered field
+field[0,*] += 1.d                                   ; incident field
+a = total(real_part(field * conj(field)), 1)        ; intensity
 
 return, reform(a, nx, ny)
 end
