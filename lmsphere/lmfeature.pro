@@ -42,6 +42,11 @@
 ;    nfringes: Number of fringes to use to set range.
 ;        Default: 20
 ;
+;    range: If set to a positive integer, this value will
+;        be used for the range.  If set to an array of two elements,
+;        it specifies an interval of possible ranges within which
+;        the fringe-counting method will set the range.
+;
 ;    maxrefits: Maxmimum number of refits due to large displacements.
 ;        Default: 1
 ;
@@ -201,6 +206,7 @@ function lmfeature, a, lambda, mpp, $
                     noise = noise, $
                     maxrefits = maxrefits, $
                     nfringes = nfringes, $
+                    range = rng, $
                     pickn = pickn, $
                     count = count, $
                     rp = rp, $
@@ -332,8 +338,15 @@ refit:
    ismin = ismin[w]
 
    ;;; region of interest
-   n = nfringes < (nfound - 1)     ; range set by fringe number.
-   range = rn[n]                
+   if isa(rng, /number, /scalar) then $   ; range specified
+      range = long(rng) > 2 $
+   else begin                             ; range set by fringe number
+      n = nfringes < (nfound - 1)
+      range = rn[n]
+      if isa(rng, /number, /array) then $ ; constrain range to interval
+         range = range > rng[0] < rng[1]
+   endelse
+   
    xc = rc[0]
    yc = rc[1]
    x0 = round(xc - range) > 0 < maxx

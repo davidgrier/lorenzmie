@@ -47,6 +47,8 @@
 ;        Compute either the even (DEINTERLACE = 2) or
 ;        odd (DEINTERLACE = 1) field of an interlaced hologram.
 ;        Default: Return the full hologram.
+;    NOZ: (Initialization)
+;        Eliminate z-component of scattered field from intensity calculation.
 ;
 ; METHODS:
 ;    GetProperty: Get accessible properties
@@ -796,6 +798,7 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                alpha = alpha,   $ ; relative illumination amplitude
                                delta = delta,   $ ; illumination wavefront distortion
                                deinterlace = deinterlace, $
+                               noz = noz          ; eliminate z-component of field
                                gpu = gpu          ; use GPU, if available
 
 COMPILE_OPT IDL2, HIDDEN
@@ -833,6 +836,8 @@ if isa(deinterlace, /scalar, /number) then begin
       self.ny = floor(self.ny/2.) + (self.ny mod 2) * (self.deinterlace - 1)
    endif
 endif
+
+self.noz = keyword_set(noz)
 
 ;;; Initialize GPU
 self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
@@ -951,6 +956,7 @@ struct = {DGGdhmLMSphere,            $
           lambda:      0.D,          $ ; vacuum wavelength [um]
           k:           0.D,          $ ; wavenumber in medium [pixel^-1]
           deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
+          noz:         0,            $ ; flag: if set, ignore z-component of field
           nx:          0L,           $ ; width of deinterlaced hologram
           ny:          0L,           $ ; height of deinterlaced hologram
           gpu:         0             $ ; flag: 1 if GPU enabled
