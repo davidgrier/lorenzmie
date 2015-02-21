@@ -122,6 +122,8 @@
 ;    Optionally limit resolution of Lorenz-Mie coefficients.
 ; 07/24/2013 DGG Anonymous data structures allow for resizing.
 ; 07/25/2013 DGG CPU code returns correct fields.
+; 02/21/2015 DGG use V pointer property as hook for subclasses
+;    to provide alternative geommetries.
 ;
 ; NOTES:
 ; Use low-level GPU routines for speed.
@@ -130,7 +132,7 @@
 ; Optionally force single precision?
 ; Allow for indexing points -- calculate only at specified points
 ; 
-; Copyright (c) 2011-2013 David G. Grier
+; Copyright (c) 2011-2015 David G. Grier
 ;-    
 
 ;;;;
@@ -151,7 +153,7 @@ ny = self.ny
 npts = nx * ny
 stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
-v = self.v
+v = self.geom
 
 (*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
 (*v).x = reform((*v).x, npts, /overwrite)
@@ -653,6 +655,7 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
                                  type = type, $
+                                 geom = geom,
                                  gpu = gpu
 
 COMPILE_OPT IDL2, HIDDEN
@@ -688,6 +691,7 @@ if arg_present(delta) then delta = self.delta
 if arg_present(lambda) then lambda = self.lambda
 if arg_present(mpp) then mpp = self.mpp
 if arg_present(deinterlace) then deinterlace = self.deinterlace
+if arg_present(geom) then geom = self.geom
 if arg_present(type) then type = self.type
 if arg_present(gpu) then gpu = self.gpu
 
@@ -716,7 +720,7 @@ v = {x: dblarr(npts), $
      sinkr: dblarr(npts) $
     }
 
-self.v = ptr_new(v, /no_copy)
+self.geom = ptr_new(v, /no_copy) ; work with locally defined geometry
 end
 
 ;;;;
@@ -773,7 +777,7 @@ v = {x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      dn:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      hologram: gpumake_array(nx, ny, type = ftype, /NOZERO) $
     }
-self.v = ptr_new(v, /no_copy)
+self.geom = ptr_new(v, /no_copy) ; work on locally defined geometry
 
 return, 1B
 end
@@ -842,6 +846,8 @@ self.noz = keyword_set(noz)
 ;;; Initialize GPU
 self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
 if ~self.gpu then self->CPUInit
+self.v = self.geom              ; by default, use locally defined geometry
+                                ; to compute field
 
 ;;; Optional inputs
 if (n_elements(rp) eq 3) then $
@@ -910,9 +916,9 @@ COMPILE_OPT IDL2, HIDDEN
 if ptr_valid(self.hologram) then $
    ptr_free, self.hologram
 
-if ptr_valid(self.v) then begin
+if ptr_valid(self.geom) then begin
    if self.gpu then begin
-      v = *(self.v)
+      v = *(self.geom)
       gpufree, [v.x, v.y, v.z]
       gpufree, [v.rho, v.kr]
       gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
@@ -923,7 +929,7 @@ if ptr_valid(self.v) then begin
       gpufree, v.dn
       gpufree, v.hologram
    endif
-   ptr_free, self.v
+   ptr_free, self.geom
 endif
 
 end
@@ -944,7 +950,8 @@ struct = {DGGdhmLMSphere,            $
           dim:         [0L, 0L],     $ ; dimensions of hologram
           ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
           resolution:  0.D,          $ ; resolution to 
-          v:           ptr_new(),    $ ; structure of preallocated variables
+          v:           ptr_new(),    $ ; pointer to structure of preallocated variables
+          geom:        ptr_new(),    $ ; local copy of preallocated variables
           type:        0,            $ ; data type (double if possible)
           rp:          dblarr(3),    $ ; 3D position [pixel]
           ap:          0.D,          $ ; sphere radius [um]
