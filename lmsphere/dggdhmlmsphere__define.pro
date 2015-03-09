@@ -15,12 +15,16 @@
 ;
 ; PROPERTIES:
 ;    NOTE: R = Required for initialization
+;          I = Optionally used for initialization
 ;          G = Get
 ;          S = Set
 ;
 ;    [RG ] DIM:    [nx, ny] dimensions of hologram [pixels].
+;    [IG ] R0:     coordinates of lower-left pixel [pixels]
+;                  Default: [0,0]
 ;    [RGS] LAMBDA: vacuum wavelength of light [um]
 ;    [RGS] MPP:    magnification [um/pixel]
+
 ;    
 ;    [ GS] RP: [xp, yp, zp] position of the center of the sphere 
 ;                  relative to the center of the image in the focal
@@ -121,39 +125,30 @@
 ;    all acceleration modes by subclassing the base class.
 ;
 ; NOTES:
-; Use low-level GPU routines for speed.
 ; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
-; Optionally force single precision?
 ; Allow for indexing points -- calculate only at specified points
+; Use masking to handle deinterlacing.
 ; 
 ; Copyright (c) 2011-2015 David G. Grier
 ;-    
 
 ;;;;
 ;
-; DGGdhmLMSphere::ComputeGeometry
+; DGGdhmLMSphere::UpdateGeometry
 ;
 ; Update geometric factors on CPU
 ;
-pro DGGdhmLMSphere::ComputeGeometry
+pro DGGdhmLMSphere::UpdateGeometry
 
   COMPILE_OPT IDL2, HIDDEN
 
-  xc = self.rp[0]
-  yc = self.rp[1]
-
-  nx = self.nx
-  ny = self.ny
-  npts = nx * ny
-  stride = (self.deinterlace ne 0) ? 2.d : 1.d
-
   v = self.geometry
-
-  (*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
-  (*v).x = reform((*v).x, npts, /overwrite)
-  (*v).y = rebin(stride*dindgen(1, ny) + ((self.deinterlace mod 2) - yc), nx, ny, /sample)
-  (*v).y = reform((*v).y, npts, /overwrite)
+  coordinates = self.coordinates
+  
+  (*v).x = (*coordinates).x - self.rp[0]
+  (*v).y = (*coordinates).y - self.rp[1]
+  
   z = self.rp[2] > 1.d
   
 ; convert to spherical coordinates centered on the sphere.
@@ -170,8 +165,7 @@ pro DGGdhmLMSphere::ComputeGeometry
 
   (*v).kr *= self.k             ; reduced radial coordinate
   (*v).sinkr = sin((*v).kr)
-  (*v).coskr = cos((*v).kr)
-  
+  (*v).coskr = cos((*v).kr)  
 end
 
 ;;;;
@@ -194,9 +188,8 @@ pro DGGdhmLMSphere::Compute
   ab = *self.ab                 ; Lorenz-Mie coefficients
   nc = n_elements(ab[0,*]) - 1  ; number of terms
   
-  self->ComputeGeometry
+  self.UpdateGeometry
 
-  npts = self.nx * self.ny      ; number of points in hologram
   v = self.v                    ; preallocated variables
 
   ;; starting points for recursive function evaluation ...
@@ -208,10 +201,10 @@ pro DGGdhmLMSphere::Compute
   pi_nm1 = 0.d                  ; \pi_0(\cos\theta)
   pi_n   = 1.d                  ; \pi_1(\cos\theta)
 
-  Mo1n = dcomplexarr(npts, 3, /NOZERO)
+  Mo1n = dcomplexarr((*v).npts, 3, /NOZERO)
   Mo1n[*, 0] = dcomplex(0)
-  Ne1n = dcomplexarr(npts, 3, /NOZERO)
-  Es = dcomplexarr(npts, 3)
+  Ne1n = dcomplexarr((*v).npts, 3, /NOZERO)
+  Es = dcomplexarr((*v).npts, 3)
 
   ;; Compute field by summing multipole contributions
   for n = 1.d, nc do begin
@@ -451,27 +444,40 @@ end
 
 ;;;;
 ;
-; DGGdhmLMSphere:CPUInit
+; DGGdhmLMSphere::CreateGeometry
 ;
-; Allocate CPU memory
-;
-pro DGGdhmLMSphere::CPUInit
+pro DGGdhmLMSphere::CreateGeometry
 
   COMPILE_OPT IDL2,  HIDDEN
+
+  nx = self.nx
+  ny = self.ny
+  npts = nx * ny
+  stride = (self.deinterlace ne 0) ? 2.d : 1.d
   
-  npts = self.nx * self.ny
-  geometry = {x: dblarr(npts), $
-              y: dblarr(npts), $
-              rho: dblarr(npts), $
-              kr: dblarr(npts), $
+  x = rebin(dindgen(nx), nx, ny, /sample)
+  x = reform(x, npts, /overwrite) - self.r0[0]
+  y = rebin(stride*dindgen(1, ny) + (self.deinterlace mod 2), nx, ny, /sample)
+  y = reform(y, npts, /overwrite) - self.r0[1]
+  
+  coordinates = {x: x, $
+                 y: y  $
+                }
+  
+  geometry = {x: dblarr(npts),        $
+              y: dblarr(npts),        $
+              rho: dblarr(npts),      $
+              kr: dblarr(npts),       $
               costheta: dblarr(npts), $
               sintheta: dblarr(npts), $
-              cosphi: dblarr(npts), $
-              sinphi: dblarr(npts), $
-              coskr: dblarr(npts), $
-              sinkr: dblarr(npts) $
+              cosphi: dblarr(npts),   $
+              sinphi: dblarr(npts),   $
+              coskr: dblarr(npts),    $
+              sinkr: dblarr(npts),    $
+              npts: npts              $
              }
-
+  
+  self.coordinates = ptr_new(coordinates, /no_copy)
   self.geometry = ptr_new(geometry, /no_copy) ; work with locally defined geometry
 end
 
@@ -484,6 +490,7 @@ end
 function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                lambda = lambda, $ ; wavelength [um]        (R)
                                mpp    = mpp,    $ ; mag [um/pixel]         (R)
+                               r0     = r0,     $ ; coordinates of lower-left pixel
                                xp = xp,         $ ; sphere position [pixel]
                                yp = yp,         $
                                zp = zp,         $
@@ -527,15 +534,15 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
      endif
   endif
 
-  self.noz = keyword_set(noz)
+  self.r0 = isa(r0, /number, /array) ? double(r0) : [0.d, 0]
 
-  self->CPUInit
+  self.CreateGeometry
   self.v = self.geometry        ; by default, use locally defined geometry
                                 ; to compute field
-
+  self.noz = keyword_set(noz)
+  
   ;;; Optional inputs
-  if (n_elements(rp) eq 3) then $
-     self.rp = double(rp)
+  self.rp = (n_elements(rp) eq 3) ? double(rp) : [dim/2, 100.]
 
   if isa(xp, /scalar, /number) then $
      self.rp[0] = double(xp)
@@ -586,6 +593,9 @@ pro DGGdhmLMSphere::Cleanup
   if ptr_valid(self.hologram) then $
      ptr_free, self.hologram
 
+  if ptr_valid(self.coordinates) then $
+     ptr_free, self.coordinates
+  
   if ptr_valid(self.geometry) then $
      ptr_free, self.geometry
 end
@@ -604,8 +614,10 @@ pro DGGdhmLMSphere__define
             INHERITS     IDL_OBJECT,   $
             hologram:    ptr_new(),    $ ; computed hologram
             dim:         [0L, 0L],     $ ; dimensions of hologram
+            r0:          [0.d, 0],     $ ; coordinates of lower-left corner
             ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
-            resolution:  0.D,          $ ; resolution to 
+            resolution:  0.D,          $ ; resolution to
+            coordinates: ptr_new(),    $ ; Cartesian coordinates of pixels
             v:           ptr_new(),    $ ; pointer to structure of preallocated variables
             geometry:    ptr_new(),    $ ; local copy of preallocated variables
             rp:          dblarr(3),    $ ; 3D position [pixel]
