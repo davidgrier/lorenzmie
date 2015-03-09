@@ -19,26 +19,26 @@
 ;          G = Get
 ;          S = Set
 ;
-;    DIM:        (RG ) [nx, ny] dimensions of hologram [pixels].
-;    LAMBDA:     (RGS) vacuum wavelength of light [um]
-;    MPP:        (RGS) magnification [um/pixel]
+;    [RG ] DIM:    [nx, ny] dimensions of hologram [pixels].
+;    [RGS] LAMBDA: vacuum wavelength of light [um]
+;    [RGS] MPP:    magnification [um/pixel]
 ;    
-;    RP:         ( GS) [XP, YP, ZP] position of the center of the sphere 
-;                      relative to the center of the image in the focal
-;                      plane. [pixel]
-;    XP:         ( GS) x-coordinate of the sphere's center [pixel]
-;    YP:         ( GS) y-coordinate of the sphere's center [pixel]
-;    ZP:         ( GS) z-coordinate of the sphere's center [pixel]
-;    AP:         ( GS) radius of sphere [um]
-;    NP:         ( GS) complex refractive index of sphere
-;    NM:         ( GS) complex refractive index of medium
-;    ALPHA:      ( GS) relative amplitude of illumination
-;    DELTA:      ( GS) wavefront distortion [pixel]
+;    [ GS] RP: [xp, yp, zp] position of the center of the sphere 
+;                  relative to the center of the image in the focal
+;                  plane. [pixel]
+;    [ GS] XP: x-coordinate of the sphere's center [pixel]
+;    [ GS] YP: y-coordinate of the sphere's center [pixel]
+;    [ GS] ZP: z-coordinate of the sphere's center [pixel]
+;    [ GS] AP: radius of sphere [um]
+;    [ GS] NP: complex refractive index of sphere
+;    [ GS] NM: complex refractive index of medium
+;    [ GS] ALPHA: relative amplitude of illumination
+;    [ GS] DELTA: wavefront distortion [pixel]
 ; 
-;    HOLOGRAM:   ( G ) real-valued computed holographic image
-;    FIELD:      ( G ) complex-valued scattered field
-;    AB:         ( GS) Lorenz-Mie scattering coefficients
-;    RESOLUTION: ( GS) Resolution of Lorenz-Mie coefficients.
+;    [ G ] HOLOGRAM: real-valued computed holographic image
+;    [ G ] FIELD:    complex-valued scattered field
+;    [ GS] AB:       Generalized Lorenz-Mie scattering coefficients
+;    [ GS] RESOLUTION: Resolution of Lorenz-Mie coefficients.
 ;                      0: Full resolution
 ;                      1e-5: No noticable loss of quality.
 ;
@@ -153,7 +153,7 @@ ny = self.ny
 npts = nx * ny
 stride = (self.deinterlace ne 0) ? 2.d : 1.d
 
-v = self.geom
+v = self.geometry
 
 (*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
 (*v).x = reform((*v).x, npts, /overwrite)
@@ -202,8 +202,7 @@ nc = n_elements(ab[0,*]) - 1    ; number of terms
 self->computeGeometryCPU
 
 npts = self.nx * self.ny        ; number of points in hologram
-;v = *(self.v)                   ; preallocated variables
-v = self.v
+v = self.v                      ; preallocated variables
 
 ; starting points for recursive function evaluation ...
 ; ... Riccati-Bessel radial functions, page 478
@@ -655,7 +654,7 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
                                  type = type, $
-                                 geom = geom,
+                                 geometry = geometry,
                                  gpu = gpu
 
 COMPILE_OPT IDL2, HIDDEN
@@ -691,7 +690,7 @@ if arg_present(delta) then delta = self.delta
 if arg_present(lambda) then lambda = self.lambda
 if arg_present(mpp) then mpp = self.mpp
 if arg_present(deinterlace) then deinterlace = self.deinterlace
-if arg_present(geom) then geom = self.geom
+if arg_present(geometry) then geometry = self.geometry
 if arg_present(type) then type = self.type
 if arg_present(gpu) then gpu = self.gpu
 
@@ -708,19 +707,19 @@ pro DGGdhmLMSphere::CPUInit
 COMPILE_OPT IDL2,  HIDDEN
 
 npts = self.nx * self.ny
-v = {x: dblarr(npts), $
-     y: dblarr(npts), $
-     rho: dblarr(npts), $
-     kr: dblarr(npts), $
-     costheta: dblarr(npts), $
-     sintheta: dblarr(npts), $
-     cosphi: dblarr(npts), $
-     sinphi: dblarr(npts), $
-     coskr: dblarr(npts), $
-     sinkr: dblarr(npts) $
+geometry = {x: dblarr(npts), $
+            y: dblarr(npts), $
+            rho: dblarr(npts), $
+            kr: dblarr(npts), $
+            costheta: dblarr(npts), $
+            sintheta: dblarr(npts), $
+            cosphi: dblarr(npts), $
+            sinphi: dblarr(npts), $
+            coskr: dblarr(npts), $
+            sinkr: dblarr(npts) $
     }
 
-self.geom = ptr_new(v, /no_copy) ; work with locally defined geometry
+self.geometry = ptr_new(geometry, /no_copy) ; work with locally defined geometry
 end
 
 ;;;;
@@ -777,7 +776,7 @@ v = {x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      dn:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
      hologram: gpumake_array(nx, ny, type = ftype, /NOZERO) $
     }
-self.geom = ptr_new(v, /no_copy) ; work on locally defined geometry
+self.geometry = ptr_new(v, /no_copy) ; work with locally defined geometry
 
 return, 1B
 end
@@ -846,7 +845,7 @@ self.noz = keyword_set(noz)
 ;;; Initialize GPU
 self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
 if ~self.gpu then self->CPUInit
-self.v = self.geom              ; by default, use locally defined geometry
+self.v = self.geometry          ; by default, use locally defined geometry
                                 ; to compute field
 
 ;;; Optional inputs
@@ -916,9 +915,9 @@ COMPILE_OPT IDL2, HIDDEN
 if ptr_valid(self.hologram) then $
    ptr_free, self.hologram
 
-if ptr_valid(self.geom) then begin
+if ptr_valid(self.geometry) then begin
    if self.gpu then begin
-      v = *(self.geom)
+      v = *(self.geometry)
       gpufree, [v.x, v.y, v.z]
       gpufree, [v.rho, v.kr]
       gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
@@ -929,7 +928,7 @@ if ptr_valid(self.geom) then begin
       gpufree, v.dn
       gpufree, v.hologram
    endif
-   ptr_free, self.geom
+   ptr_free, self.geometry
 endif
 
 end
@@ -951,7 +950,7 @@ struct = {DGGdhmLMSphere,            $
           ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
           resolution:  0.D,          $ ; resolution to 
           v:           ptr_new(),    $ ; pointer to structure of preallocated variables
-          geom:        ptr_new(),    $ ; local copy of preallocated variables
+          geometry:    ptr_new(),    $ ; local copy of preallocated variables
           type:        0,            $ ; data type (double if possible)
           rp:          dblarr(3),    $ ; 3D position [pixel]
           ap:          0.D,          $ ; sphere radius [um]
