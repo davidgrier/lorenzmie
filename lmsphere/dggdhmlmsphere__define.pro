@@ -165,7 +165,7 @@ pro DGGdhmLMSphere::UpdateGeometry
 
   (*v).kr *= self.k             ; reduced radial coordinate
   (*v).sinkr = sin((*v).kr)
-  (*v).coskr = cos((*v).kr)  
+  (*v).coskr = cos((*v).kr)
 end
 
 ;;;;
