@@ -343,7 +343,6 @@ pro generalizedLorenzMie::UpdateGeometry
   (*v).E0[*, 0] = (*v).cosphi * (*v).sintheta
   (*v).E0[*, 1] = (*v).cosphi * (*v).costheta
   (*v).E0[*, 2] = -(*v).sinphi
-
 end
 
 ;;;;
@@ -370,9 +369,11 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
                  z: z  $
                 }
 
+  ;;; NOTE: Can we use a HASH for geometry so that the
+  ;;; dimensions are not fixed at initialization?
+  ;;; How will that affect efficiency?
   var = dblarr(npts, /NOZERO)
   fvar = dcomplexarr(npts, 3, /NOZERO)
-  ;; cvar = dcomplexarr(npts)
   geometry = {x: x, $
               y: y, $
               z: z, $
@@ -385,14 +386,6 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
               coskr:    var, $
               sinkr:    var, $
               E0:       fvar, $
-  ;; xi_nm2           
-  ;; xi_nm1
-  ;; xi_n
-  ;; Mo1n
-  ;; Ne1n
-  ;; swisc
-  ;; twisc
-  ;; tau_n
               npts: npts              $
              }
   
