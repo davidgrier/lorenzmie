@@ -131,17 +131,6 @@ pro generalizedLorenzMie::Compute
 
   v = self.v
 
-  ;; NOTE: Allocate memory for variables?  Impact on speed?
-  ;; xi_nm2
-  ;; xi_nm1
-  ;; xi_n
-  ;; Mo1n
-  ;; Ne1n
-  ;; Es
-  ;; swisc
-  ;; twisc
-  ;; tau_n
-  
   ;; starting points for recursive function evaluation ...
   ;; ... Riccati-Bessel radial functions, page 478
   xi_nm2 = dcomplex((*v).coskr, (*v).sinkr) ; \xi_{-1}(kr)
@@ -218,7 +207,7 @@ pro generalizedLorenzMie::Compute
   Es *= self.alpha * exp(-ci*self.k*(self.rp[2] + self.delta))
   Es += (*v).E0
 
-  *self.hologram = total(real_part(Es * conj(Es)), 2)
+  self.hologram = ptr_new(total(real_part(Es * conj(Es)), 2), /no_copy)
 end
 
 ;;;;
@@ -350,10 +339,11 @@ pro generalizedLorenzMie::UpdateGeometry
   (*v).sinkr = sin((*v).kr)
   (*v).coskr = cos((*v).kr)
 
-  ;;; incident field in spherical coordinates
+  ;; incident field in spherical coordinates
   (*v).E0[*, 0] = (*v).cosphi * (*v).sintheta
   (*v).E0[*, 1] = (*v).cosphi * (*v).costheta
   (*v).E0[*, 2] = -(*v).sinphi
+
 end
 
 ;;;;
@@ -491,10 +481,6 @@ function generalizedLorenzMie::Init, xc = x, $ ; coordinates of hologram pixels 
   ;; Optics
   self.alpha = isa(alpha, /scalar, /number) ? double(alpha) : 1.d
   self.delta = isa(delta, /scalar, /number) ? double(delta) : 0.d
-
-  ;; storage for the result
-  a = dblarr((*self.geometry).npts, /nozero)
-  self.hologram = ptr_new(a, /no_copy)
 
   return, 1B
 end

@@ -36,8 +36,13 @@
 ;    [IGS] AP:     Radius of sphere [um]
 ;    [IGS] NP:     Refractive index of sphere
 ;    [ GS] KP:     Imaginary part of refractive index
+;    [ G ] AB:     Generalized Lorenz-Mie scattering coefficients
+;    [IGS] PRECISION: precision at which to keep LM coefficients.
+;                  Smaller values (better precision) retain more
+;                  terms at the cost of additional computational cost.
+;                  Setting to 0 keeps full set of coefficients.
+;                  Default: 1e-7
 ;
-;    [ G ] AB:     Generalized Lorenz-Mie scattering coefficients    
 ;    [IGS] RP:     [xp, yp, zp] Position of the center of the scatterer
 ;                  in the coordinate system defined by (x,y,z) [pixel]
 ;    [ GS] XP: x-coordinate of the scatterer's center [pixel]
