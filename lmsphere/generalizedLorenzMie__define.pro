@@ -319,15 +319,17 @@ pro generalizedLorenzMie::UpdateGeometry
 
   v = self.geometry
   coordinates = self.coordinates
-  
-  v['x'] = (*coordinates).x - self.rp[0]
-  v['y'] = (*coordinates).y - self.rp[1]
-  v['z'] = (*coordinates).z + self.rp[2]
 
-; convert to spherical coordinates centered on the sphere.
-; (r, theta, phi) is the spherical coordinate of the pixel
-; at (x,y) in the imaging plane at distance z from the
-; center of the sphere.
+  ;; Cartesian coordinates in focal plane relative
+  ;; to position of the scatterer.
+  v['x'] = coordinates['x'] - self.rp[0]
+  v['y'] = coordinates['y'] - self.rp[1]
+  v['z'] = coordinates['z']+ self.rp[2]
+
+  ;; convert to spherical coordinates centered on the sphere.
+  ;; (r, theta, phi) is the spherical coordinate of the pixel
+  ;; at (x,y) in the imaging plane at distance z from the
+  ;; center of the sphere.
   v['rho'] = sqrt(v['x']^2 + v['y']^2)
   v['kr'] = sqrt(v['rho']^2 + v['z']^2)
   v['costheta'] = v['z']/v['kr']
@@ -340,7 +342,8 @@ pro generalizedLorenzMie::UpdateGeometry
   v['kr'] *= self.k
   v['sinkr'] = sin(v['kr'])
   v['coskr'] = cos(v['kr'])
-  
+
+  ;; incident field in spherical coordinates
   v['E0'] = [[v['cosphi']*v['sintheta']], $
              [v['cosphi']*v['costheta']], $
              [-v['sinphi']]]
@@ -364,13 +367,8 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
      ((ny ne 1) && (ny ne npts)) || $
      ((nz ne 1) && (nz ne npts)) then $
         return, 0B
-  
-  coordinates = {x: x, $
-                 y: y, $
-                 z: z  $
-                }
-  
-  self.coordinates = ptr_new(coordinates, /no_copy)
+
+  self.coordinates = hash('x', x, 'y', y, 'z', z)
 
   self.geometry = hash()
   self.geometry['npts'] = npts
@@ -495,13 +493,11 @@ pro generalizedLorenzMie__define
 
   struct = {generalizedLorenzMie,      $
             INHERITS     IDL_OBJECT,   $
-            coordinates: ptr_new(),    $ ; Cartesian coordinates of pixels
+            coordinates: obj_new(),    $ ; Cartesian coordinates of pixels
             ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
             resolution:  0.D,          $ ; resolution limit for LM coefficients
             rp:          dblarr(3),    $ ; 3D particle position [pixel]
             v:           ptr_new(),    $ ; pointer to structure of preallocated variables
-;            geometry:    ptr_new(),    $ ; local copy of preallocated
-;            variables
             geometry:    obj_new(),  $
             lambda:      0.D,          $ ; vacuum wavelength [um]
             nm:          dcomplex(0.), $ ; medium refractive index
