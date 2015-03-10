@@ -129,21 +129,22 @@ pro generalizedLorenzMie::Compute
 
   ci = dcomplex(0, 1)           ; imaginary unit
 
-  v = self.v
+  v = self.geometry
+  npts = v['npts']
 
   ;; starting points for recursive function evaluation ...
   ;; ... Riccati-Bessel radial functions, page 478
-  xi_nm2 = dcomplex((*v).coskr, (*v).sinkr) ; \xi_{-1}(kr)
-  xi_nm1 = dcomplex((*v).sinkr,-(*v).coskr) ; \xi_0(kr)
+  xi_nm2 = dcomplex(v['coskr'], v['sinkr']) ; \xi_{-1}(kr)
+  xi_nm1 = dcomplex(v['sinkr'],-v['coskr']) ; \xi_0(kr)
 
   ;; ... angular functions (4.47), page 95
   pi_nm1 = 0.d                  ; \pi_0(\cos\theta)
   pi_n   = 1.d                  ; \pi_1(\cos\theta)
 
-  Mo1n = dcomplexarr((*v).npts, 3, /NOZERO)
+  Mo1n = dcomplexarr(npts, 3, /NOZERO)
   Mo1n[*, 0] = dcomplex(0)
-  Ne1n = dcomplexarr((*v).npts, 3, /NOZERO)
-  Es = dcomplexarr((*v).npts, 3)
+  Ne1n = dcomplexarr(npts, 3, /NOZERO)
+  Es = dcomplexarr(npts, 3)
 
   ;; Compute field by summing multipole contributions
   for n = 1.d, nc do begin
@@ -151,15 +152,15 @@ pro generalizedLorenzMie::Compute
   ;; upward recurrences ...
   ;; ... Legendre factor (4.47)
   ;; Method described by Wiscombe (1980)
-     swisc = pi_n * (*v).costheta
+     swisc = pi_n * v['costheta']
      twisc = swisc - pi_nm1
      tau_n = pi_nm1 - n * twisc ; -\tau_n(\cos\theta)
 
   ;; ... Riccati-Bessel function, page 478
-     xi_n = (2.d*n - 1.d) * (xi_nm1 / (*v).kr) - xi_nm2 ; \xi_n(kr)
+     xi_n = (2.d*n - 1.d) * (xi_nm1 / v['kr']) - xi_nm2 ; \xi_n(kr)
 
   ;; ... Deirmendjian's derivative
-     dn = (n * xi_n) / (*v).kr - xi_nm1
+     dn = (n * xi_n) / v['kr'] - xi_nm1
 
   ;; vector spherical harmonics (4.50)
   ;;   Mo1n[*, 0] = dcomplex(0.d)   ; no radial component
@@ -191,9 +192,9 @@ pro generalizedLorenzMie::Compute
   ;; geometric factors were divided out of the vector
   ;; spherical harmonics for accuracy and efficiency ...
   ;; ... put them back at the end.
-  Es[*, 0] *= (*v).cosphi * (*v).sintheta / (*v).kr^2
-  Es[*, 1] *= (*v).cosphi / (*v).kr
-  Es[*, 2] *= (*v).sinphi / (*v).kr
+  Es[*, 0] *= v['cosphi'] * v['sintheta'] / v['kr']^2
+  Es[*, 1] *= v['cosphi'] / v['kr']
+  Es[*, 2] *= v['sinphi'] / v['kr']
 
   ;;; Hologram
   ;;;
@@ -205,7 +206,7 @@ pro generalizedLorenzMie::Compute
   ;;           - \sin\phi \hat{\phi}
   ;;
   Es *= self.alpha * exp(-ci*self.k*(self.rp[2] + self.delta))
-  Es += (*v).E0
+  Es += v['E0']
 
   self.hologram = ptr_new(total(real_part(Es * conj(Es)), 2), /no_copy)
 end
@@ -319,30 +320,30 @@ pro generalizedLorenzMie::UpdateGeometry
   v = self.geometry
   coordinates = self.coordinates
   
-  (*v).x = (*coordinates).x - self.rp[0]
-  (*v).y = (*coordinates).y - self.rp[1]
-  (*v).z = (*coordinates).z + self.rp[2]
+  v['x'] = (*coordinates).x - self.rp[0]
+  v['y'] = (*coordinates).y - self.rp[1]
+  v['z'] = (*coordinates).z + self.rp[2]
 
 ; convert to spherical coordinates centered on the sphere.
 ; (r, theta, phi) is the spherical coordinate of the pixel
 ; at (x,y) in the imaging plane at distance z from the
 ; center of the sphere.
-  (*v).rho = sqrt((*v).x^2 + (*v).y^2)
-  (*v).kr  = sqrt((*v).rho^2 + (*v).z^2)
-  (*v).costheta = (*v).z/(*v).kr
-  (*v).sintheta = (*v).rho/(*v).kr
-  phi = atan((*v).y, (*v).x)
-  (*v).cosphi = cos(phi)
-  (*v).sinphi = sin(phi)
+  v['rho'] = sqrt(v['x']^2 + v['y']^2)
+  v['kr'] = sqrt(v['rho']^2 + v['z']^2)
+  v['costheta'] = v['z']/v['kr']
+  v['sintheta'] = v['rho']/v['kr']
 
-  (*v).kr *= self.k             ; reduced radial coordinate
-  (*v).sinkr = sin((*v).kr)
-  (*v).coskr = cos((*v).kr)
+  phi = atan(v['y'], v['x'])
+  v['cosphi'] = cos(phi)
+  v['sinphi'] = sin(phi)
 
-  ;; incident field in spherical coordinates
-  (*v).E0[*, 0] = (*v).cosphi * (*v).sintheta
-  (*v).E0[*, 1] = (*v).cosphi * (*v).costheta
-  (*v).E0[*, 2] = -(*v).sinphi
+  v['kr'] *= self.k
+  v['sinkr'] = sin(v['kr'])
+  v['coskr'] = cos(v['kr'])
+  
+  v['E0'] = [[v['cosphi']*v['sintheta']], $
+             [v['cosphi']*v['costheta']], $
+             [-v['sinphi']]]
 end
 
 ;;;;
@@ -368,31 +369,11 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
                  y: y, $
                  z: z  $
                 }
-
-  ;;; NOTE: Can we use a HASH for geometry so that the
-  ;;; dimensions are not fixed at initialization?
-  ;;; How will that affect efficiency?
-  var = dblarr(npts, /NOZERO)
-  fvar = dcomplexarr(npts, 3, /NOZERO)
-  geometry = {x: x, $
-              y: y, $
-              z: z, $
-              rho:      var, $
-              kr:       var, $
-              costheta: var, $
-              sintheta: var, $
-              cosphi:   var, $
-              sinphi:   var, $
-              coskr:    var, $
-              sinkr:    var, $
-              E0:       fvar, $
-              npts: npts              $
-             }
   
   self.coordinates = ptr_new(coordinates, /no_copy)
-  self.geometry = ptr_new(geometry, /no_copy) ; locally defined geometry
 
-  self.v = self.geometry
+  self.geometry = hash()
+  self.geometry['npts'] = npts
 
   return, 1B
 end
@@ -495,8 +476,8 @@ pro generalizedLorenzMie::Cleanup
   if ptr_valid(self.coordinates) then $
      ptr_free, self.coordinates
   
-  if ptr_valid(self.geometry) then $
-     ptr_free, self.geometry
+;  if ptr_valid(self.geometry) then $
+;     ptr_free, self.geometry
 
   if ptr_valid(self.hologram) then $
      ptr_free, self.hologram
@@ -519,7 +500,9 @@ pro generalizedLorenzMie__define
             resolution:  0.D,          $ ; resolution limit for LM coefficients
             rp:          dblarr(3),    $ ; 3D particle position [pixel]
             v:           ptr_new(),    $ ; pointer to structure of preallocated variables
-            geometry:    ptr_new(),    $ ; local copy of preallocated variables
+;            geometry:    ptr_new(),    $ ; local copy of preallocated
+;            variables
+            geometry:    obj_new(),  $
             lambda:      0.D,          $ ; vacuum wavelength [um]
             nm:          dcomplex(0.), $ ; medium refractive index
             alpha:       0.D,          $ ; relative illumination amplitude

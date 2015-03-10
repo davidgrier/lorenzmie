@@ -147,11 +147,17 @@ end
 
 ;;;;;
 ;
-; dhmLorenzMie::Init()
+; dhmLorenzMie::MakeCoordinates
 ;
-function dhmLorenzMie::Init, dimensions = dimensions, $
-                             r0 = r0,                 $
-                             _ref_extra = re
+; Creates a square-grid coordinate system of specified
+; dimensions and with specified coordinate for the lower-left
+; corner.  The coordinate system is returned as a hash with
+; elements 'x', 'y' and 'z'.
+;
+; Overload this function to select pixels from this grid.
+;
+function dhmLorenzMie::MakeCoordinates, dimensions, r0
+
   COMPILE_OPT IDL2, HIDDEN
 
   if n_elements(dimensions) ne 2 then begin
@@ -170,7 +176,21 @@ function dhmLorenzMie::Init, dimensions = dimensions, $
   
   z = 0.d                       ; focal plane
 
-  return, self.LorenzMie::Init(xc = x, yc = y, zc = z, _extra = re)
+  return, hash('x', x, 'y', y, 'z', z)
+end
+
+;;;;;
+;
+; dhmLorenzMie::Init()
+;
+function dhmLorenzMie::Init, dimensions = dimensions, $
+                             r0 = r0,                 $
+                             _ref_extra = re
+  COMPILE_OPT IDL2, HIDDEN
+
+  v = self.MakeCoordinates(dimensions, r0)
+
+  return, self.LorenzMie::Init(xc = v['x'], yc = v['y'], zc = v['z'], _extra = re)
 end
 
 ;;;;;
