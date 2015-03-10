@@ -27,6 +27,7 @@
 ;    [IGS] R0:     [x0, y0] coordinates of the lower-left pixel
 ;                  of the hologram.  [pixels]
 ;                  Default: [0,0]
+;
 ; INHERITED PROPERTIES
 ;    [RGS] LAMBDA: Vacuum wavelength of light [um]
 ;    [RGS] MPP:    Magnification [um/pixel]
@@ -47,7 +48,6 @@
 ;    [IGS] DELTA: wavefront distortion [pixel]
 ; 
 ;    [ G ] HOLOGRAM: real-valued computed holographic image
-;    [ G ] FIELD:    complex-valued scattered field
 ;
 ; METHODS:
 ;    GetProperty: Get accessible properties

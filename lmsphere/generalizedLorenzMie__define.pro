@@ -216,9 +216,7 @@ pro generalizedLorenzMie::Compute
   ;;           - \sin\phi \hat{\phi}
   ;;
   Es *= self.alpha * exp(-ci*self.k*(self.rp[2] + self.delta))
-  Es[*, 0] += (*v).cosphi * (*v).sintheta
-  Es[*, 1] += (*v).cosphi * (*v).costheta
-  Es[*, 2] -= (*v).sinphi
+  Es += (*v).E0
 
   *self.hologram = total(real_part(Es * conj(Es)), 2)
 end
@@ -259,7 +257,7 @@ pro generalizedLorenzMie::SetProperty, ab = ab, $
   if isa(yp, /scalar, /number) then self.rp[1] = double(yp)
   if isa(zp, /scalar, /number) then self.rp[2] = double(zp)
   if (n_elements(rp) eq 3) then self.rp = double(rp)
-  if max(abs(orp-self.rp)) ne 0 then self.UpdateGeometry
+  if total(orp ne self.rp) gt 0 then self.UpdateGeometry
 
   ;;; Optics
   if isa(lambda, /scalar, /number) then self.lambda = double(lambda)
@@ -351,6 +349,11 @@ pro generalizedLorenzMie::UpdateGeometry
   (*v).kr *= self.k             ; reduced radial coordinate
   (*v).sinkr = sin((*v).kr)
   (*v).coskr = cos((*v).kr)
+
+  ;;; incident field in spherical coordinates
+  (*v).E0[*, 0] = (*v).cosphi * (*v).sintheta
+  (*v).E0[*, 1] = (*v).cosphi * (*v).costheta
+  (*v).E0[*, 2] = -(*v).sinphi
 end
 
 ;;;;
@@ -378,6 +381,7 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
                 }
 
   var = dblarr(npts, /NOZERO)
+  fvar = dcomplexarr(npts, 3, /NOZERO)
   ;; cvar = dcomplexarr(npts)
   geometry = {x: x, $
               y: y, $
@@ -390,12 +394,12 @@ function generalizedLorenzMie::CreateGeometry, x, y, z
               sinphi:   var, $
               coskr:    var, $
               sinkr:    var, $
+              E0:       fvar, $
   ;; xi_nm2           
   ;; xi_nm1
   ;; xi_n
   ;; Mo1n
   ;; Ne1n
-  ;; Es
   ;; swisc
   ;; twisc
   ;; tau_n

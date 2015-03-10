@@ -24,6 +24,11 @@
 ;    [IGS] AP:     Radius of sphere [um]
 ;    [IGS] NP:     Refractive index of sphere
 ;    [ GS] KP:     Imaginary part of refractive index
+;    [IGS] PRECISION: precision at which to keep LM coefficients.
+;                  Smaller values (better precision) retain more
+;                  terms at the cost of additional computational cost.
+;                  Setting to 0 keeps full set of coefficients.
+;                  Default: 1e-7
 ;
 ; INHERITED PROPERTIES
 ;    [R  ] XC:     Coordinates at which to compute hologram [pixel]
@@ -44,7 +49,6 @@
 ;    [IGS] DELTA: wavefront distortion [pixel]
 ; 
 ;    [ G ] HOLOGRAM: real-valued computed holographic image
-;    [ G ] FIELD:    complex-valued scattered field
 ;
 ; METHODS:
 ;    GetProperty: Get accessible properties
@@ -196,7 +200,7 @@ function LorenzMie::Init, ap = ap,               $
 
   self.ap = isa(ap, /number, /scalar) ? double(ap) : 1.D
   self.np = isa(np, /number, /scalar) ? dcomplex(np) : dcomplex(1.4)
-  self.precision = isa(precision, /number, /scalar) ? double(precision) > 0. : 0.
+  self.precision = isa(precision, /number, /scalar) ? double(precision) > 0d : 1d-7
   ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, $
                            resolution = self.precision)
   self.ab = ptr_new(ab, /no_copy)
