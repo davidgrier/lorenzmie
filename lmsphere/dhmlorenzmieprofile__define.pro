@@ -23,6 +23,12 @@
 ;
 ; PROPERTIES
 ;    [RG ] RADIUS: Radius of the profile [pixels]
+;    [IGS] RP:     Coordinates of sphere center [pixels]
+;                  Default: [0.d, 0.d, 100.d]
+;                  Note: Setting RP[0] and RP[1], or equivalently
+;                    XP and YP, results in an off-center profile.
+;                    This may be desirable in special cases, but
+;                    is not anticipated to be the usual behavior.
 ;
 ; INHERITED PROPERTIES
 ;    [RGS] LAMBDA: Vacuum wavelength of light [um]
@@ -161,7 +167,7 @@ function dhmLorenzMieprofile::MakeCoordinates, radius
   self.radius = long(radius)
 
   x = dindgen(radius)
-  y = 0.D
+  y = 0.d
   z = 0.d                       ; focal plane
 
   return, hash('x', x, 'y', y, 'z', z)
@@ -171,14 +177,22 @@ end
 ;
 ; dhmLorenzMieprofile::Init()
 ;
-function dhmLorenzMieprofile::Init, dimensions = dimensions, $
-                                    r0 = r0,                 $
+function dhmLorenzMieprofile::Init, radius = radius, $
+                                    rp = rp,         $
                                     _ref_extra = re
   COMPILE_OPT IDL2, HIDDEN
 
-  v = self.MakeCoordinates(dimensions, r0)
+  v = self.MakeCoordinates(radius)
 
-  return, self.LorenzMie::Init(xc = v['x'], yc = v['y'], zc = v['z'], _extra = re)
+  if isa(rp, /number, /array) && (n_elements(rp) eq 3) then begin
+     self.rp = double(rp)
+     if self.rp[0] ne 0. || self.rp[1] ne 0. then $
+        message, 'placing particle off-center', /inf
+  endif else $
+     self.rp = [0.d, 0.d, 100.d]
+  
+  return, self.LorenzMie::Init(xc = v['x'], yc = v['y'], zc = v['z'], $
+                               rp = rp, _extra = re)
 end
 
 ;;;;;
