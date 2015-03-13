@@ -448,7 +448,7 @@ function generalizedLorenzMie::Init, xc = x, $ ; coordinates of hologram pixels 
   if isa(zp, /scalar, /number) then $
      self.rp[2] = double(zp)
 
-  cpu, tpool_min_elts = 10000
+;  cpu, tpool_min_elts = 10000
   
   self.UpdateGeometry
   
@@ -469,7 +469,7 @@ pro generalizedLorenzMie::Cleanup
 
   COMPILE_OPT IDL2, HIDDEN
 
-  cpu, /reset
+;  cpu, /reset
   
   if ptr_valid(self.coordinates) then $
      ptr_free, self.coordinates
