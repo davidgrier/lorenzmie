@@ -178,18 +178,18 @@ end
 ; dhmLorenzMieprofile::Init()
 ;
 function dhmLorenzMieprofile::Init, radius = radius, $
-                                    rp = rp,         $
+                                    rp = _rp,         $
                                     _ref_extra = re
   COMPILE_OPT IDL2, HIDDEN
 
   v = self.MakeCoordinates(radius)
 
-  if isa(rp, /number, /array) && (n_elements(rp) eq 3) then begin
-     self.rp = double(rp)
-     if self.rp[0] ne 0. || self.rp[1] ne 0. then $
+  if isa(_rp, /number, /array) && (n_elements(_rp) eq 3) then begin
+     rp = double(_rp)
+     if rp[0] ne 0. || rp[1] ne 0. then $
         message, 'placing particle off-center', /inf
   endif else $
-     self.rp = [0.d, 0.d, 100.d]
+     rp = [0.d, 0.d, 100.d]
   
   return, self.LorenzMie::Init(xc = v['x'], yc = v['y'], zc = v['z'], $
                                rp = rp, _extra = re)
