@@ -48,8 +48,8 @@ function polarizability, ap, np, nm, lambda
   ab = sphere_coefficients(ap, np, nm, lambda)
 
   k = 2.*!pi*nm/lambda
-  alphae = !const.i * 6. * !const.pi * !const.eps0 * nm^2 * ab[0, 0] / k^3
-  alpham = !const.i * 6. * !const.pi * ab[1, 0] / (!const.mu0 * k^3)
+  alphae = !const.i * 6. * !const.pi * !const.eps0 * nm^2 * ab[0, 1] / k^3
+  alpham = !const.i * 6. * !const.pi * ab[1, 1] / (!const.mu0 * k^3)
 
   return, [alphae, alpham]
 end
