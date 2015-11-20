@@ -170,9 +170,10 @@
 ; ap.
 ; 12/12/2013 DGG Updated for new version of ctfeature.
 ; 04/24/2014 DGG Specify RP as an option.
+; 11/20/2015 DGG and Mark Hannel Avoid divergences in zp estimate.
 ;
-; Copyright (c) 2008-2014 David G. Grier, Bhaskar Jyoti Krishnatreya,
-;    David Ruffner and Fook Chiong Cheong
+; Copyright (c) 2008-2015 David G. Grier, Bhaskar Jyoti Krishnatreya,
+;    David Ruffner, Fook Chiong Cheong and Mark Hannel
 ;-
 ;;;;;
 ;
@@ -382,8 +383,8 @@ refit:
          rho = findgen(range) + 0.5
          lap = deriv(aa)        ; Laplacian of azimuthal profile
          lap = deriv(lap) + lap/rho
-         w = where(abs(aa-1.) gt 1e-2)
-         qsq = -lap[w]/(aa[w] - 1.)
+         w = where((abs(aa-1.) gt 1e-2) && (abs(lap) gt 1e-2))
+         qsq = -lap[w]/(aa[w] - 1.) 
          zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
          w = where(zsq gt 0., ngood)
          if ngood lt 2 then begin
