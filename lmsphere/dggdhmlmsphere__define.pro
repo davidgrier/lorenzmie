@@ -654,7 +654,7 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
                                  type = type, $
-                                 geometry = geometry,
+                                 geometry = geometry, $
                                  gpu = gpu
 
 COMPILE_OPT IDL2, HIDDEN
@@ -801,7 +801,7 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                alpha = alpha,   $ ; relative illumination amplitude
                                delta = delta,   $ ; illumination wavefront distortion
                                deinterlace = deinterlace, $
-                               noz = noz          ; eliminate z-component of field
+                               noz = noz, $       ; eliminate z-component of field
                                gpu = gpu          ; use GPU, if available
 
 COMPILE_OPT IDL2, HIDDEN
