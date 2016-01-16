@@ -23,6 +23,10 @@
 ;        alpha[0]: electric polarizability
 ;        alpha[1]: magnetic polarizability
 ;
+; KEYWORD FLAGS:
+;    electric: only output electric polarizability
+;    magnetic: only output magnetic polarizability
+;
 ; REFERENCES:
 ; 1. C. F. Bohren and D. R. Huffman,
 ;    Absorption and Scattering of Light by Small Particles,
@@ -41,7 +45,9 @@
 ;
 ; Copyright (c) 2015 David G. Grier
 ;-
-function polarizability, ap, np, nm, lambda
+function polarizability, ap, np, nm, lambda, $
+                         electric = electric, $
+                         magnetic = magnetic
 
   COMPILE_OPT IDL2
 
@@ -50,6 +56,12 @@ function polarizability, ap, np, nm, lambda
   k = 2.*!pi*nm/lambda
   alphae = !const.i * 6. * !const.pi * !const.eps0 * nm^2 * ab[0, 1] / k^3
   alpham = !const.i * 6. * !const.pi * ab[1, 1] / (!const.mu0 * k^3)
+
+  if keyword_set(electric) then $
+     return, alphae
+
+  if keyword_set(magnetic) then $
+     return, alpham
 
   return, [alphae, alpham]
 end
