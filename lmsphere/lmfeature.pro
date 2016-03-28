@@ -172,7 +172,7 @@
 ; 04/24/2014 DGG Specify RP as an option.
 ; 11/20/2015 DGG and Mark Hannel Avoid divergences in zp estimate.
 ;
-; Copyright (c) 2008-2015 David G. Grier, Bhaskar Jyoti Krishnatreya,
+; Copyright (c) 2008-2016 David G. Grier, Bhaskar Jyoti Krishnatreya,
 ;    David Ruffner, Fook Chiong Cheong and Mark Hannel
 ;-
 ;;;;;
@@ -271,8 +271,8 @@ function lmfeature, a, lambda, mpp, $
 
   k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
 
-  dozp = 1                        ; estimate axial position of each feature
-  doap = ~isa(ap, /number, /scalar)              ; estimate radius of each feature
+  dozp = 1                          ; estimate axial position of each feature
+  doap = ~isa(ap, /number, /scalar) ; estimate radius of each feature
   j0n = [2.4048, 5.5201, 8.6537, 11.7915, 14.9309] ; zeros of J0(x) used for estimating ap
 ;j1n = [3.8317, 7.0156, 10.1735, 13.3237, 16.4706] ; zeros of J1(x) used for estimating ap
 
