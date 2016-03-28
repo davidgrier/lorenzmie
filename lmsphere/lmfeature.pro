@@ -174,6 +174,7 @@
 ; 12/12/2013 DGG Updated for new version of ctfeature.
 ; 04/24/2014 DGG Specify RP as an option.
 ; 11/20/2015 DGG and Mark Hannel Avoid divergences in zp estimate.
+; 03/28/2016 DGG and Mark Hannel Specify zp on input.
 ;
 ; Copyright (c) 2008-2016 David G. Grier, Bhaskar Jyoti Krishnatreya,
 ;    David Ruffner, Fook Chiong Cheong and Mark Hannel
