@@ -30,6 +30,9 @@
 ;    rp: [2,npts] array of initial position estimates
 ;        Default: estimated from image with ctfeature().
 ;
+;    zp: ballpark height of sphere(s) above focal plane [pixels].
+;        Default: estimated from image for each feature.
+;
 ;    ap: ballpark radius of sphere [micrometers]
 ;        Default: estimated from image
 ;
@@ -211,6 +214,7 @@ function lmfeature, a, lambda, mpp, $
                     pickn = pickn, $
                     count = count, $
                     rp = rp, $
+                    zp = zp_, $
                     ap = ap, $
                     fixap = fixap, $
                     np = np0, $
@@ -297,9 +301,18 @@ function lmfeature, a, lambda, mpp, $
   quiet = ~keyword_set(debug)
    
   ;;; Find candidate features
-  if ~isa(rp, /number, /array) then $
+  if isa(rp, /number, /array) then begin
+     nfeatures = n_elements(rp[0, *])
+     zp = rp[2, *]
+     dozp = 0
+  endif else begin
      rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
-
+     if isa(zp_, /number, /scalar) then begin
+        zp = replicate(zp_, nfeatures)
+        dozp = 0
+     endif
+  endelse
+     
   if nfeatures le 0 then $
      return, features
 
@@ -391,15 +404,16 @@ refit:
               continue
            endif
            sigmatrim, zsq[w], mzsq
-           zp = sqrt(mzsq)      ; estimated axial position [pixel]
+           thiszp = sqrt(mzsq)  ; estimated axial position [pixel]
         endif else $
-           zp = ap*(4.*k)/median(j0n/rn[where(ismin)])
-     endif
+           thiszp = ap*(4.*k)/median(j0n/rn[where(ismin)])
+     endif else $
+        thiszp = zp[ndx]
 
      ;; Model observed interference pattern as Poisson's spot to
      ;; obtain radius, ap, from axial position, zp
      if doap then $
-        ap = zp/(4.*k)*median(j0n/rn[where(ismin)])
+        ap = thiszp/(4.*k)*median(j0n/rn[where(ismin)])
 
      ;; Estimate np: FIXME: currently uses input value: np0
 
@@ -408,7 +422,7 @@ refit:
      delta = 0.d
      
      ;; Starting Estimates
-     p0 = [zp, ap, real_part(np0), imaginary(np0), $
+     p0 = [thiszp, ap, real_part(np0), imaginary(np0), $
            real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
      
      if ~quiet then lmf_report, 'starting estimates:', [rc, p0]
