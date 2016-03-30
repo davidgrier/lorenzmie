@@ -256,6 +256,20 @@ pro DGGdhmLMSphere::Compute
   Es[*, 1] *= (*v).cosphi / (*v).kr
   Es[*, 2] *= (*v).sinphi / (*v).kr
 
+  ;; angular demagnification
+  ;; Abbe sine condition
+  ;; sinthetap = noil * sintheta/M
+  ;; costhetap = sqrt(1 - sinthetap^2)
+  
+  ;; solid angle projection
+  ;; fac = sqrt(costhetap/costheta)
+  ;; Es[*, 1] *= fac
+  ;; Es[*, 2] *= fac
+
+  ;; k-vector rotation
+  ;; costheta = costhetap
+  ;; sintheta = sinthetap
+  
   ;;; Hologram
   ;;;
   ;;; I(\vec{r}) = |\hat{x} + \alpha \exp(-i k zp) \vec{E}_s(\vec{r})|^2

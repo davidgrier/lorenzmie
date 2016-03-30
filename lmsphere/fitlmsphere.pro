@@ -349,7 +349,8 @@ p = mpfitfun('lmsphere_f', obj, aa, err, p0, $
              perror = perror, bestnorm = chisq, dof = dof, $
              status = status, errmsg = errmsg, quiet = quiet, $
              yfit = yfit, best_resid = residuals)
-residuals = reform(residuals, nx, n_elements(residuals)/nx)
+if arg_present(residuals) then $
+   residuals = reform(residuals, nx, n_elements(residuals)/nx)
 
 ; failure
 if status le 0 then $
