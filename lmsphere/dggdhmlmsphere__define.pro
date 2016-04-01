@@ -130,7 +130,7 @@
 ; Allow for indexing points -- calculate only at specified points
 ; Use masking to handle deinterlacing.
 ; 
-; Copyright (c) 2011-2015 David G. Grier
+; Copyright (c) 2011-2016 David G. Grier
 ;-    
 
 ;;;;
@@ -188,8 +188,6 @@ pro DGGdhmLMSphere::Compute
   ab = *self.ab                 ; Lorenz-Mie coefficients
   nc = n_elements(ab[0,*]) - 1  ; number of terms
   
-  self.UpdateGeometry
-
   v = self.v                    ; preallocated variables
 
   ;; starting points for recursive function evaluation ...
@@ -328,10 +326,16 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
   newcoeffs = 0B              ; flag to determine if new Lorenz-Mie coefficients are required
 
   ;;; Geometry
-  if isa(xp, /scalar, /number) then self.rp[0] = double(xp)
-  if isa(yp, /scalar, /number) then self.rp[1] = double(yp)
-  if isa(zp, /scalar, /number) then self.rp[2] = double(zp)
-  if (n_elements(rp) eq 3) then self.rp = double(rp)
+  if (doupdate = isa(xp, /scalar, /number)) then $
+     self.rp[0] = double(xp)
+  if (doupdate or= isa(yp, /scalar, /number)) then $
+     self.rp[1] = double(yp)
+  if (doupdate or= isa(zp, /scalar, /number)) then $
+     self.rp[2] = double(zp)
+  if (doupdate or= (n_elements(rp) eq 3))) then $
+     self.rp = double(rp)
+  if doupdate then $
+     self.UpdateGeometry
 
   if isa(mpp, /scalar, /number) then $
      self.mpp = double(mpp)
@@ -589,7 +593,8 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
   a = dblarr(self.nx, self.ny, /nozero)
   self.hologram = ptr_new(a, /no_copy)
 
-  self->compute
+  self.UpdateGeometry
+  self.Compute
 
   return, 1B
 end
