@@ -188,7 +188,7 @@ pro DGGdhmLMSphere::Compute
   ab = *self.ab                 ; Lorenz-Mie coefficients
   nc = n_elements(ab[0,*]) - 1  ; number of terms
   
-  v = self.v                    ; preallocated variables
+  v = self.geometry             ; preallocated variables
 
   ;; starting points for recursive function evaluation ...
   ;; ... Riccati-Bessel radial functions, page 478
@@ -401,7 +401,7 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
   endif
 
   ;;; compute hologram
-  self->compute
+  self.Compute
 end
 
 ;;;;
@@ -435,9 +435,6 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
 
   if arg_present(hologram) then $
      hologram = *(self.hologram)
-
-  if arg_present(field) then $
-     field = *((*self.v).Es)
 
   if arg_present(ab) then ab = *(self.ab)
   if arg_present(resolution) then resolution = self.resolution
@@ -555,8 +552,6 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
   self.r0 = isa(r0, /number, /array) ? double(r0) : [0.d, 0]
 
   self.CreateGeometry
-  self.v = self.geometry        ; by default, use locally defined geometry
-                                ; to compute field
   self.noz = keyword_set(noz)
   
   ;;; Optional inputs
@@ -637,7 +632,6 @@ pro DGGdhmLMSphere__define
             ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
             resolution:  0.D,          $ ; resolution to
             coordinates: ptr_new(),    $ ; Cartesian coordinates of pixels
-            v:           ptr_new(),    $ ; pointer to structure of preallocated variables
             geometry:    ptr_new(),    $ ; local copy of preallocated variables
             rp:          dblarr(3),    $ ; 3D position [pixel]
             ap:          0.D,          $ ; sphere radius [um]
