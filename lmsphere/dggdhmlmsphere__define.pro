@@ -627,6 +627,7 @@ pro DGGdhmLMSphere__define
   struct = {DGGdhmLMSphere,            $
             INHERITS     IDL_OBJECT,   $
             hologram:    ptr_new(),    $ ; computed hologram
+            field:       ptr_new(),    $ ; scattered field
             dim:         [0L, 0L],     $ ; dimensions of hologram
             r0:          [0.d, 0],     $ ; coordinates of lower-left corner
             ab:          ptr_new(),    $ ; Lorenz-Mie coefficients

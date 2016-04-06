@@ -392,22 +392,19 @@ refit:
      ;; Use radial profile to estimate axial position, zp,
      ;; David Ruffner's method based on spherical wave model.
      if dozp then begin
-        if doap then begin
-           rho = findgen(range) + 0.5
-           lap = deriv(aa)      ; Laplacian of azimuthal profile
-           lap = deriv(lap) + lap/rho
-           w = where((abs(aa-1.) gt 1e-2) && (abs(lap) gt 1e-2))
-           qsq = -lap[w]/(aa[w] - 1.) 
-           zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
-           w = where(zsq gt 0., ngood)
-           if ngood lt 2 then begin
-              message, 'could not estimate zp -- skipping this feature', /inf
-              continue
-           endif
-           sigmatrim, zsq[w], mzsq
-           thiszp = sqrt(mzsq)  ; estimated axial position [pixel]
-        endif else $
-           thiszp = ap*(4.*k)/median(j0n/rn[where(ismin)])
+        rho = findgen(range) + 0.5
+        lap = deriv(aa)         ; Laplacian of azimuthal profile
+        lap = deriv(lap) + lap/rho
+        w = where((abs(aa-1.) gt 1e-2) && (abs(lap) gt 1e-2))
+        qsq = -lap[w]/(aa[w] - 1.) 
+        zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
+        w = where(zsq gt 0., ngood)
+        if ngood lt 2 then begin
+           message, 'could not estimate zp -- skipping this feature', /inf
+           continue
+        endif
+        sigmatrim, zsq[w], mzsq
+        thiszp = sqrt(mzsq)     ; estimated axial position [pixel]
      endif else $
         thiszp = zp[ndx]
 
