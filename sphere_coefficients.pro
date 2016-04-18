@@ -113,7 +113,7 @@ COMPILE_OPT IDL2
 nlayers = n_elements(ap)
 
 if n_elements(np) ne nlayers then $
-   message, "Error Warning: ap and np must have the same number of elements"
+   message, "ap and np must have the same number of elements"
 
 ; arrange shells in size order
 if nlayers gt 1 then begin
