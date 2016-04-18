@@ -153,7 +153,7 @@ Hb = dcomplexarr(nlayers, nmax+1)
 ; Calculate D1, D3 and PsiZeta for Z1 in the first layer
 z1 = x[0] * m[0]
 ; D1_a[0, nmax + 1] = dcomplex(0) ; Eq. (16a)
-for n = nmax + 1.d, 1.d, -1.d do begin ; downward recurrence Eq. (16b)
+for n = nmax + 1, 1, -1 do begin ; downward recurrence Eq. (16b)
    dn = double(n)
    D1_a[0, n-1] = dn/z1 - 1.d/(D1_a[0, n] + dn/z1)
 endfor
