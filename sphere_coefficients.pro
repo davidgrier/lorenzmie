@@ -245,11 +245,11 @@ endfor
 
 ; Scattering coefficients
 n = dindgen(nmax + 1)
-ab[0, *]  = (Ha[-1, *]/m[-1] + n/x[-1]) * Psi  - shift(Psi,  1) / $
-            (Ha[-1, *]/m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)     ; Eq. (5)
-ab[1, *]  = (Hb[-1, *]*m[-1] + n/x[-1]) * Psi  - shift(Psi,  1) / $
-            (Hb[-1, *]*m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)     ; Eq. (6)
-ab[*, 0]  = dcomplex(0)
+ab[0, *] = ((Ha[-1, *]/m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
+           ((Ha[-1, *]/m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (5)
+ab[1, *] = ((Hb[-1, *]*m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
+           ((Hb[-1, *]*m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (6)
+ab[*, 0] = dcomplex(0)
 
 if keyword_set(resolution) then begin
    w = where(total(abs(ab), 1) gt resolution, ngood)
