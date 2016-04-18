@@ -73,7 +73,7 @@
 ; 07/22/2013 DGG RESOLUTION retains up to last coefficient
 ;    with sufficiently large magnitude.
 ;
-; Copyright (c) 2010-2013 F. C. Cheong and D. G. Grier
+; Copyright (c) 2010-2016 F. C. Cheong and D. G. Grier
 ; 
 
 ;;;;;
@@ -153,14 +153,17 @@ Hb = dcomplexarr(nlayers, nmax+1)
 ; Calculate D1, D3 and PsiZeta for Z1 in the first layer
 z1 = x[0] * m[0]
 ; D1_a[0, nmax + 1] = dcomplex(0) ; Eq. (16a)
-for n = nmax + 1.d, 1.d, -1.d do $ ; downward recurrence Eq. (16b)
-   D1_a[0, n-1] = n/z1 - 1.d/(D1_a[0, n] + n/z1)
+for n = nmax + 1.d, 1.d, -1.d do begin ; downward recurrence Eq. (16b)
+   dn = double(n)
+   D1_a[0, n-1] = dn/z1 - 1.d/(D1_a[0, n] + dn/z1)
+endfor
 
 PsiZeta_a[0, 0] = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
 D3_a[0, 0] = ci                                     ; Eq. (18a)
-for n = 1.d, nmax do begin      ;upward recurrence Eq. (18b)
+for n = 1, nmax do begin                            ;upward recurrence Eq. (18b)
+   dn = double(n)
    PsiZeta_a[0, n] = PsiZeta_a[0, n-1] * $
-                     (n/z1 - D1_a[0, n-1]) * (n/z1 - D3_a[0, n-1])
+                     (dn/z1 - D1_a[0, n-1]) * (dn/z1 - D3_a[0, n-1])
    D3_a[0, n] = D1_a[0, n] + ci/PsiZeta_a[0, n]
 endfor 
 
@@ -185,27 +188,29 @@ for ii = 1, nlayers - 1 do begin
    PsiZeta_am1[ii, 0] = 0.5d * (1.d - exp(2.d * ci * z2))
    D3_a[ii, 0]   = ci           
    D3_am1[ii, 0] = ci           
-   for n = 1.d, nmax do begin   ; Eq. (18b)
+   for n = 1, nmax do begin   ; Eq. (18b)
+      dn = double(n)
       PsiZeta_a[ii, n]   = PsiZeta_a[ii, n-1] * $
-                           (n/z1 -  D1_a[ii, n-1]) * $
-                           (n/z1 -  D3_a[ii, n-1])
+                           (dn/z1 -  D1_a[ii, n-1]) * $
+                           (dn/z1 -  D3_a[ii, n-1])
       PsiZeta_am1[ii, n] = PsiZeta_am1[ii, n-1] * $
-                           (n/z2 - D1_am1[ii, n-1]) * $
-                           (n/z2 - D3_am1[ii, n-1])
+                           (dn/z2 - D1_am1[ii, n-1]) * $
+                           (dn/z2 - D3_am1[ii, n-1])
       D3_a[ii, n]   = D1_a[ii, n]   + ci/PsiZeta_a[ii, n]
       D3_am1[ii, n] = D1_am1[ii, n] + ci/PsiZeta_am1[ii, n]
    endfor 
 
    ; Upward recurrence for Q
    Q[ii, 0] = (exp(-2.d * ci * z2) - 1.d) / (exp(-2.d * ci * z1) - 1.d)
-   for n = 1.d, nmax do begin
-      Num = (z1 * D1_a[ii, n]   + n) * (n - z1 * D3_a[ii, n-1])
-      Den = (z2 * D1_am1[ii, n] + n) * (n - z2 * D3_am1[ii, n-1])
+   for n = 1, nmax do begin
+      dn = double(n)
+      Num = (z1 * D1_a[ii, n]   + dn) * (dn - z1 * D3_a[ii, n-1])
+      Den = (z2 * D1_am1[ii, n] + n) * (dn - z2 * D3_am1[ii, n-1])
       Q[ii, n] = (x[ii-1]/x[ii])^2 * Q[ii, n-1] * Num/Den
    endfor 
 
    ; Upward recurrence for Ha and Hb, Eqs. (7b), (8b) and (12) - (15)
-   for n = 1.d, nmax do begin
+   for n = 1, nmax do begin
       G1 = m[ii] * Ha[ii-1, n] - m[ii-1] * D1_am1[ii, n]
       G2 = m[ii] * Ha[ii-1, n] - m[ii-1] * D3_am1[ii, n]
       Temp = Q[ii, n] * G1
@@ -225,18 +230,21 @@ endfor                          ;ii (layers)
 z1 = dcomplex(x[-1])
 ; Downward recurrence for D1, Eqs. (16a) and (16b)
 ; D1[nmax+1] = dcomplex(0)   ; Eq. (16a)
-for n = nmax, 1.d, -1.d do $ ; Eq. (16b)
-   D1[n-1] = n/z1 - (1.d/(D1[n] + n/z1))
+for n = nmax, 1, -1 do begin    ; Eq. (16b)
+   dn = double(n)
+   D1[n-1] = dn/z1 - (1.d/(D1[n] + dn/z1))
+endfor
 
 ; Upward recurrence for Psi, Zeta, PsiZeta and D3, Eqs. (18a) and (18b)
 Psi[0]     = sin(z1)       ; Eq. (18a)
 Zeta[0]    = -ci * exp(ci * z1)
 PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * z1))
 D3[0] = ci
-for n = 1.d, nmax do begin ; Eq. (18b)
-   Psi[n]  = Psi[n-1]  * (n/z1 - D1[n-1])
-   Zeta[n] = Zeta[n-1] * (n/z1 - D3[n-1])
-   PsiZeta[n] = PsiZeta[n-1] * (n/z1 -D1[n-1]) * (n/z1 - D3[n-1])
+for n = 1, nmax do begin        ; Eq. (18b)
+   dn = double(n)
+   Psi[n]  = Psi[n-1]  * (dn/z1 - D1[n-1])
+   Zeta[n] = Zeta[n-1] * (dn/z1 - D3[n-1])
+   PsiZeta[n] = PsiZeta[n-1] * (dn/z1 -D1[n-1]) * (dn/z1 - D3[n-1])
    D3[n] = D1[n] + ci/PsiZeta[n]
 endfor
 
