@@ -159,12 +159,12 @@ for n = nmax + 1, 1, -1 do begin ; downward recurrence Eq. (16b)
 endfor
 
 PsiZeta_a[0, 0] = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
-D3_a[0, 0] = ci                                     ; Eq. (18a)
-for n = 1, nmax do begin                            ;upward recurrence Eq. (18b)
+D3_a[0, 0] = ci                                     ; Eq. (18b)
+for n = 1, nmax do begin                            ; upward recurrence
    dn = double(n)
-   PsiZeta_a[0, n] = PsiZeta_a[0, n-1] * $
+   PsiZeta_a[0, n] = PsiZeta_a[0, n-1] * $          ; Eq. (18c)
                      (dn/z1 - D1_a[0, n-1]) * (dn/z1 - D3_a[0, n-1])
-   D3_a[0, n] = D1_a[0, n] + ci/PsiZeta_a[0, n]
+   D3_a[0, n] = D1_a[0, n] + ci/PsiZeta_a[0, n]     ; Eq. (18d)
 endfor 
 
 ; Ha and Hb in the core
@@ -175,24 +175,23 @@ Hb[0, *] = D1_a[0, 0:-2]     ; Eq. (8a)
 for ii = 1, nlayers - 1 do begin 
    z1 = x[ii] * m[ii]
    z2 = x[ii-1] * m[ii]
-   ; Downward recurrence for D1, Eqs. (16a) and (16b)
-;   D1_a[ii, nmax+1]   = dcomplex(0)      ; Eq. (16a)
-;   D1_am1[ii, nmax+1] = dcomplex(0)
-   for n = nmax + 1.d, 1.d, -1.d do begin ; Eq. (16 b)
-      D1_a[ii, n-1]   = n/z1 - 1.d/(D1_a[ii, n]   + n/z1)
-      D1_am1[ii, n-1] = n/z2 - 1.d/(D1_am1[ii, n] + n/z2)
+   ; Downward recurrence for D1
+   for n = nmax + 1, 1, -1 do begin ; Eq. (16b)
+      dn = double(n)
+      D1_a[ii, n-1]   = dn/z1 - 1.d/(D1_a[ii, n]   + dn/z1)
+      D1_am1[ii, n-1] = dn/z2 - 1.d/(D1_am1[ii, n] + dn/z2)
    endfor 
 
-   ; Upward recurrence for PsiZeta and D3, Eqs. (18a) and (18b)
+   ; Upward recurrence for PsiZeta and D3
    PsiZeta_a[ii, 0]   = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
    PsiZeta_am1[ii, 0] = 0.5d * (1.d - exp(2.d * ci * z2))
-   D3_a[ii, 0]   = ci           
+   D3_a[ii, 0]   = ci           ; Eq. (18b)     
    D3_am1[ii, 0] = ci           
-   for n = 1, nmax do begin   ; Eq. (18b)
+   for n = 1, nmax do begin     ; Eq. (18c)
       dn = double(n)
       PsiZeta_a[ii, n]   = PsiZeta_a[ii, n-1] * $
-                           (dn/z1 -  D1_a[ii, n-1]) * $
-                           (dn/z1 -  D3_a[ii, n-1])
+                           (dn/z1 - D1_a[ii, n-1]) * $
+                           (dn/z1 - D3_a[ii, n-1])
       PsiZeta_am1[ii, n] = PsiZeta_am1[ii, n-1] * $
                            (dn/z2 - D1_am1[ii, n-1]) * $
                            (dn/z2 - D3_am1[ii, n-1])
@@ -200,13 +199,14 @@ for ii = 1, nlayers - 1 do begin
       D3_am1[ii, n] = D1_am1[ii, n] + ci/PsiZeta_am1[ii, n]
    endfor 
 
-   ; Upward recurrence for Q
+   ;; Upward recurrence for Q
+   ; Eq. (19a)
    Q[ii, 0] = (exp(-2.d * ci * z2) - 1.d) / (exp(-2.d * ci * z1) - 1.d)
-   for n = 1, nmax do begin
+   for n = 1, nmax do begin ; Eq. (19b)
       dn = double(n)
-      Num = (z1 * D1_a[ii, n]   + dn) * (dn - z1 * D3_a[ii, n-1])
-      Den = (z2 * D1_am1[ii, n] + n) * (dn - z2 * D3_am1[ii, n-1])
-      Q[ii, n] = (x[ii-1]/x[ii])^2 * Q[ii, n-1] * Num/Den
+      Q[ii, n] = Q[ii, n-1] * (x[ii-1]/x[ii])^2 * $
+                 (z2 * D1_am1[ii, n] + dn)/(z1 * D1_a[ii, n] + dn) * $
+                 (dn - z2 * D3_am1[ii, n])/(dn - z1 * D3_a[ii, n])
    endfor 
 
    ; Upward recurrence for Ha and Hb, Eqs. (7b), (8b) and (12) - (15)
