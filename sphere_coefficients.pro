@@ -146,7 +146,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
   D3_z2[0] = ci
   
   ;;; Iterate outward from the sphere's core
-  ;; Initialize Ha and Hb
+  ;; Initialize Ha and Hb in core
   z1 = x[0] * m[0]
   for n = nmax+1, 1, -1 do begin ; Downward recurrence for D1
      dn = double(n)
@@ -155,7 +155,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
   Ha = D1_z1[0:-2]              ; Eq. (7a)
   Hb = D1_z1[0:-2]              ; Eq. (8a)
 
-  ;; Iterate from layer 2 to outermost layer L
+  ;; Iterate outward from layer 2 to outermost layer L
   for ii = 1, nlayers - 1 do begin 
      z1 = x[ii] * m[ii]
      z2 = x[ii-1] * m[ii]
@@ -181,7 +181,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
                (dn - z2 * D3_z2[n])/(dn - z1 * D3_z1[n]) ; Eq. (19b)
      endfor
 
-     ;; Outward propagation: Update Ha and Hb
+     ;; Update Ha and Hb
      G1 = m[ii] * Ha - m[ii-1] * D1_z2                  ; Eq. (12)
      G2 = m[ii] * Ha - m[ii-1] * D3_z2                  ; Eq. (13)
      Ha = (G2 * D1_z1 - Q * G1 * D3_z1) / (G2 - G1 * Q) ; Eq. (7b)
@@ -198,9 +198,9 @@ function sphere_coefficients, ap, np, nm, lambda, $
      D1_z1[n-1] = dn/z1 - (1.d/(D1_z1[n] + dn/z1)) ; Eq. (16b)
   endfor
 
-  Psi[0]   = sin(z1)                           ; Eq. (20a)
-  Zeta[0]  = -ci * exp(ci * z1)                ; Eq. (21a)
-  PsiZeta  = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
+  Psi[0]  = sin(z1)                           ; Eq. (20a)
+  Zeta[0] = -ci * exp(ci * z1)                ; Eq. (21a)
+  PsiZeta = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
   for n = 1, nmax do begin ; Upward recurrence for Psi, Zeta and D3
      dn = double(n)
      Psi[n]  = Psi[n-1]  * (dn/z1 - D1_z1[n-1])             ; Eq. (20b)
