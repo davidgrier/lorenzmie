@@ -223,23 +223,23 @@ for ii = 1, nlayers - 1 do begin
    endfor
 endfor                          ;ii (layers)
 
-z1 = dcomplex(x[-1])
+xL = dcomplex(x[-1])
 ; Downward recurrence for D1
 for n = nmax, 1, -1 do begin    ; Eq. (16b)
    dn = double(n)
-   D1[n-1] = dn/z1 - (1.d/(D1[n] + dn/z1))
+   D1[n-1] = dn/xL - (1.d/(D1[n] + dn/xL))
 endfor
 
 ; Upward recurrence for Psi, Zeta, PsiZeta and D3
-Psi[0]     = sin(z1)            ; Eq. (20a)
-Zeta[0]    = -ci * exp(ci * z1) ; Eq. (21a)
-PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
+Psi[0]     = sin(xL)            ; Eq. (20a)
+Zeta[0]    = -ci * exp(ci * xL) ; Eq. (21a)
+PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * xL)) ; Eq. (18a)
 D3[0] = ci                      ; Eq. (18b)
 for n = 1, nmax do begin
    dn = double(n)
-   Psi[n]  = Psi[n-1]  * (dn/z1 - D1[n-1]) ; Eq. (20b)
-   Zeta[n] = Zeta[n-1] * (dn/z1 - D3[n-1]) ; Eq. (21b)
-   PsiZeta[n] = PsiZeta[n-1] * (dn/z1 - D1[n-1]) * (dn/z1 - D3[n-1]) ; Eq. (18c)
+   Psi[n]  = Psi[n-1]  * (dn/xL - D1[n-1]) ; Eq. (20b)
+   Zeta[n] = Zeta[n-1] * (dn/xL - D3[n-1]) ; Eq. (21b)
+   PsiZeta[n] = PsiZeta[n-1] * (dn/xL - D1[n-1]) * (dn/xL - D3[n-1]) ; Eq. (18c)
    D3[n] = D1[n] + ci/PsiZeta[n]                                     ; Eq. (18d)
 endfor
 
