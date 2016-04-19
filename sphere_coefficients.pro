@@ -107,155 +107,148 @@ end
 function sphere_coefficients, ap, np, nm, lambda, $
                               resolution = resolution
 
+  COMPILE_OPT IDL2
 
-COMPILE_OPT IDL2
+  nlayers = n_elements(ap)
 
-nlayers = n_elements(ap)
+  if n_elements(np) ne nlayers then $
+     message, "ap and np must have the same number of elements"
 
-if n_elements(np) ne nlayers then $
-   message, "ap and np must have the same number of elements"
+  ;; arrange shells in size order
+  if nlayers gt 1 then begin
+     order = sort(ap)
+     ap = ap[order]
+     np = np[order]
+  endif
 
-; arrange shells in size order
-if nlayers gt 1 then begin
-   order = sort(ap)
-   ap = ap[order]
-   np = np[order]
-endif
+  x = 2.d * !dpi * real_part(nm) * ap / lambda ; size parameter
+  m = dcomplex(np/nm)                          ; relative refractive index
 
-x = 2.d * !dpi * real_part(nm) * ap / lambda ; size parameter [array]
-m = dcomplex(np/nm)                    ; relative refractive index [array]
+  nmax = Nstop(x, m)            ; number of terms in partial-wave expansion
 
-nmax = Nstop(x, m)              ; number of terms in partial-wave expansion
+  ci = dcomplex(0, 1)
 
-ci = dcomplex(0, 1)             ; imaginary unit
+  ;; storage for results
+  ab = dcomplexarr(2, nmax+1, /nozero)
 
-; arrays for storing results
-ab = dcomplexarr(2, nmax+1, /nozero)
+  D1     = dcomplexarr(nmax+2)
+  D1_a   = dcomplexarr(nlayers, nmax+2)
+  D1_am1 = dcomplexarr(nlayers, nmax+2)
 
-D1     = dcomplexarr(nmax+2)
-D1_a   = dcomplexarr(nlayers, nmax+2)
-D1_am1 = dcomplexarr(nlayers, nmax+2)
+  D3     = dcomplexarr(nmax+1)
+  D3_a   = dcomplexarr(nlayers, nmax+1, /nozero)
+  D3_am1 = dcomplexarr(nlayers, nmax+1)
+  
+  Psi         = dcomplexarr(nmax+1) 
+  Zeta        = dcomplexarr(nmax+1) 
+  PsiZeta     = dcomplexarr(nmax+1) 
+  PsiZeta_a   = dcomplexarr(nlayers, nmax+1, /nozero) 
+  PsiZeta_am1 = dcomplexarr(nlayers, nmax+1) 
 
-D3     = dcomplexarr(nmax+1)
-D3_a   = dcomplexarr(nlayers, nmax+1)
-D3_am1 = dcomplexarr(nlayers, nmax+1)
+  Q  = dcomplexarr(nlayers, nmax+1) 
+  Ha = dcomplexarr(nlayers, nmax+1) 
+  Hb = dcomplexarr(nlayers, nmax+1) 
 
-Psi         = dcomplexarr(nmax+1) 
-Zeta        = dcomplexarr(nmax+1) 
-PsiZeta     = dcomplexarr(nmax+1) 
-PsiZeta_a   = dcomplexarr(nlayers, nmax+1) 
-PsiZeta_am1 = dcomplexarr(nlayers, nmax+1) 
+  ;;; Fields in the sphere's core
+  z1 = x[0] * m[0]
 
-Q  = dcomplexarr(nlayers, nmax+1) 
-Ha = dcomplexarr(nlayers, nmax+1) 
-Hb = dcomplexarr(nlayers, nmax+1) 
+  ; D1_a[0, nmax + 1] = dcomplex(0) ; Eq. (16a)
+  for n = nmax + 1, 1, -1 do begin ; downward recurrence
+     dn = double(n)
+     D1_a[0, n-1] = dn/z1 - 1.d/(D1_a[0, n] + dn/z1) ; Eq. (16b)
+  endfor
 
-; Calculate D1, D3 and PsiZeta for Z1 in the first layer
-z1 = x[0] * m[0]
-; D1_a[0, nmax + 1] = dcomplex(0) ; Eq. (16a)
-for n = nmax + 1, 1, -1 do begin ; downward recurrence Eq. (16b)
-   dn = double(n)
-   D1_a[0, n-1] = dn/z1 - 1.d/(D1_a[0, n] + dn/z1)
-endfor
+  PsiZeta_a[0, 0] = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
+  D3_a[0, 0] = ci                                     ; Eq. (18b)
+  for n = 1, nmax do begin                            ; upward recurrence
+     dn = double(n)
+     PsiZeta_a[0, n] = PsiZeta_a[0, n-1] * $ ; Eq. (18c)
+                       (dn/z1 - D1_a[0, n-1]) * (dn/z1 - D3_a[0, n-1])
+     D3_a[0, n] = D1_a[0, n] + ci/PsiZeta_a[0, n] ; Eq. (18d)
+  endfor 
 
-PsiZeta_a[0, 0] = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
-D3_a[0, 0] = ci                                     ; Eq. (18b)
-for n = 1, nmax do begin                            ; upward recurrence
-   dn = double(n)
-   PsiZeta_a[0, n] = PsiZeta_a[0, n-1] * $          ; Eq. (18c)
-                     (dn/z1 - D1_a[0, n-1]) * (dn/z1 - D3_a[0, n-1])
-   D3_a[0, n] = D1_a[0, n] + ci/PsiZeta_a[0, n]     ; Eq. (18d)
-endfor 
+  Ha[0, *] = D1_a[0, 0:-2]      ; Eq. (7a)
+  Hb[0, *] = D1_a[0, 0:-2]      ; Eq. (8a)
 
-; Ha and Hb in the core
-Ha[0, *] = D1_a[0, 0:-2]     ; Eq. (7a)
-Hb[0, *] = D1_a[0, 0:-2]     ; Eq. (8a)
+  ;; Iterate from layer 2 to outermost layer L
+  for ii = 1, nlayers - 1 do begin 
+     z1 = x[ii] * m[ii]
+     z2 = x[ii-1] * m[ii]                                
+     for n = nmax + 1, 1, -1 do begin ; Downward recurrence for D1
+        dn = double(n)
+        D1_a[ii, n-1]   = dn/z1 - 1.d/(D1_a[ii, n]   + dn/z1) ; Eq. (16b)
+        D1_am1[ii, n-1] = dn/z2 - 1.d/(D1_am1[ii, n] + dn/z2)
+     endfor 
+                                
+     PsiZeta_a[ii, 0]   = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
+     PsiZeta_am1[ii, 0] = 0.5d * (1.d - exp(2.d * ci * z2))
+     D3_a[ii, 0]   = ci         ; Eq. (18b)     
+     D3_am1[ii, 0] = ci           
+     for n = 1, nmax do begin   ; Upward recurrence for PsiZeta and D3
+        dn = double(n)
+        PsiZeta_a[ii, n]   = PsiZeta_a[ii, n-1] * $
+                             (dn/z1 - D1_a[ii, n-1]) * $
+                             (dn/z1 - D3_a[ii, n-1]) ; Eq. (18c)
+        PsiZeta_am1[ii, n] = PsiZeta_am1[ii, n-1] * $
+                             (dn/z2 - D1_am1[ii, n-1]) * $
+                             (dn/z2 - D3_am1[ii, n-1])
+        D3_a[ii, n]   = D1_a[ii, n]   + ci/PsiZeta_a[ii, n]
+        D3_am1[ii, n] = D1_am1[ii, n] + ci/PsiZeta_am1[ii, n]
+     endfor 
 
-; Iterate from layer 2 to layer L
-for ii = 1, nlayers - 1 do begin 
-   z1 = x[ii] * m[ii]
-   z2 = x[ii-1] * m[ii]
-   ; Downward recurrence for D1
-   for n = nmax + 1, 1, -1 do begin ; Eq. (16b)
-      dn = double(n)
-      D1_a[ii, n-1]   = dn/z1 - 1.d/(D1_a[ii, n]   + dn/z1)
-      D1_am1[ii, n-1] = dn/z2 - 1.d/(D1_am1[ii, n] + dn/z2)
-   endfor 
+     Q[ii, 0] = (exp(-2.d * ci * z2) - 1.d) / $
+                (exp(-2.d * ci * z1) - 1.d) ; Eq. (19a)
+     for n = 1, nmax do begin               ; Upward recurrence for Q
+        dn = double(n)
+        Q[ii, n] = Q[ii, n-1] * (x[ii-1]/x[ii])^2 * $
+                   (z2 * D1_am1[ii, n] + dn)/(z1 * D1_a[ii, n] + dn) * $
+                   (dn - z2 * D3_am1[ii, n])/(dn - z1 * D3_a[ii, n]) ; Eq. (19b)
+     endfor 
 
-   ; Upward recurrence for PsiZeta and D3
-   PsiZeta_a[ii, 0]   = 0.5d * (1.d - exp(2.d * ci * z1)) ; Eq. (18a)
-   PsiZeta_am1[ii, 0] = 0.5d * (1.d - exp(2.d * ci * z2))
-   D3_a[ii, 0]   = ci           ; Eq. (18b)     
-   D3_am1[ii, 0] = ci           
-   for n = 1, nmax do begin     ; Eq. (18c)
-      dn = double(n)
-      PsiZeta_a[ii, n]   = PsiZeta_a[ii, n-1] * $
-                           (dn/z1 - D1_a[ii, n-1]) * $
-                           (dn/z1 - D3_a[ii, n-1])
-      PsiZeta_am1[ii, n] = PsiZeta_am1[ii, n-1] * $
-                           (dn/z2 - D1_am1[ii, n-1]) * $
-                           (dn/z2 - D3_am1[ii, n-1])
-      D3_a[ii, n]   = D1_a[ii, n]   + ci/PsiZeta_a[ii, n]
-      D3_am1[ii, n] = D1_am1[ii, n] + ci/PsiZeta_am1[ii, n]
-   endfor 
+     for n = 1, nmax do begin   ; Upward recurrence for Ha and Hb
+        G1 = m[ii] * Ha[ii-1, n] - m[ii-1] * D1_am1[ii, n] ; Eq. (12)
+        G2 = m[ii] * Ha[ii-1, n] - m[ii-1] * D3_am1[ii, n] ; Eq. (13)
+        Ha[ii, n] = (G2 * D1_a[ii, n] - G1 * Q[ii, n] * D3_a[ii, n]) / $
+                    (G2 - G1 * Q[ii, n]) ; Eq. (7b)
 
-   ;; Upward recurrence for Q
-   ; Eq. (19a)
-   Q[ii, 0] = (exp(-2.d * ci * z2) - 1.d) / (exp(-2.d * ci * z1) - 1.d)
-   for n = 1, nmax do begin ; Eq. (19b)
-      dn = double(n)
-      Q[ii, n] = Q[ii, n-1] * (x[ii-1]/x[ii])^2 * $
-                 (z2 * D1_am1[ii, n] + dn)/(z1 * D1_a[ii, n] + dn) * $
-                 (dn - z2 * D3_am1[ii, n])/(dn - z1 * D3_a[ii, n])
-   endfor 
+        G1 = m[ii-1] * Hb[ii-1, n] - m[ii] * D1_am1[ii, n] ; Eq. (14)
+        G2 = m[ii-1] * Hb[ii-1, n] - m[ii] * D3_am1[ii, n] ; Eq. (15)
+        Hb[ii, n] = (G2 * D1_a[ii, n] - G1 * Q1[ii, n] * D3_a[ii, n]) / $
+                    (G2 - G1 * Q[ii, n]) ; Eq. (8b)
+     endfor
+  endfor                        ;ii (layers)
 
-   ; Upward recurrence for Ha and Hb
-   for n = 1, nmax do begin
-      G1 = m[ii] * Ha[ii-1, n] - m[ii-1] * D1_am1[ii, n] ; Eq. (12)
-      G2 = m[ii] * Ha[ii-1, n] - m[ii-1] * D3_am1[ii, n] ; Eq. (13)
-      Ha[ii, n] = (G2 * D1_a[ii, n] - G1 * Q[ii, n] * D3_a[ii, n]) / $
-                  (G2 - G1 * Q[ii, n]) ; Eq. (7b)
+  xL = dcomplex(x[-1])
+  for n = nmax, 1, -1 do begin  ; Downward recurrence for D1
+     dn = double(n)
+     D1[n-1] = dn/xL - (1.d/(D1[n] + dn/xL)) ; Eq. (16b)
+  endfor
 
-      G1 = m[ii-1] * Hb[ii-1, n] - m[ii] * D1_am1[ii, n] ; Eq. (14)
-      G2 = m[ii-1] * Hb[ii-1, n] - m[ii] * D3_am1[ii, n] ; Eq. (15)
-      Hb[ii, n] = (G2 * D1_a[ii, n] - G1 * Q1[ii, n] * D3_a[ii, n]) / $
-                  (G2 - G1 * Q[ii, n]) ; Eq. (8b)
-   endfor
-endfor                          ;ii (layers)
+  Psi[0]     = sin(xL)                         ; Eq. (20a)
+  Zeta[0]    = -ci * exp(ci * xL)              ; Eq. (21a)
+  PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * xL)) ; Eq. (18a)
+  D3[0] = ci                                     ; Eq. (18b)
+  for n = 1, nmax do begin      ; Upward recurrence for Psi, Zeta, PsiZeta and D3
+     dn = double(n)
+     Psi[n]  = Psi[n-1]  * (dn/xL - D1[n-1])                         ; Eq. (20b)
+     Zeta[n] = Zeta[n-1] * (dn/xL - D3[n-1])                         ; Eq. (21b)
+     PsiZeta[n] = PsiZeta[n-1] * (dn/xL - D1[n-1]) * (dn/xL - D3[n-1]) ; Eq. (18c)
+     D3[n] = D1[n] + ci/PsiZeta[n]                                     ; Eq. (18d)
+  endfor
 
-xL = dcomplex(x[-1])
-; Downward recurrence for D1
-for n = nmax, 1, -1 do begin    ; Eq. (16b)
-   dn = double(n)
-   D1[n-1] = dn/xL - (1.d/(D1[n] + dn/xL))
-endfor
+  ;; Scattering coefficients
+  n = dindgen(nmax + 1)
+  ab[0, *] = ((Ha[-1, *]/m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
+             ((Ha[-1, *]/m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (5)
+  ab[1, *] = ((Hb[-1, *]*m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
+             ((Hb[-1, *]*m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (6)
+  ab[*, 0] = dcomplex(0)
 
-; Upward recurrence for Psi, Zeta, PsiZeta and D3
-Psi[0]     = sin(xL)            ; Eq. (20a)
-Zeta[0]    = -ci * exp(ci * xL) ; Eq. (21a)
-PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * xL)) ; Eq. (18a)
-D3[0] = ci                      ; Eq. (18b)
-for n = 1, nmax do begin
-   dn = double(n)
-   Psi[n]  = Psi[n-1]  * (dn/xL - D1[n-1]) ; Eq. (20b)
-   Zeta[n] = Zeta[n-1] * (dn/xL - D3[n-1]) ; Eq. (21b)
-   PsiZeta[n] = PsiZeta[n-1] * (dn/xL - D1[n-1]) * (dn/xL - D3[n-1]) ; Eq. (18c)
-   D3[n] = D1[n] + ci/PsiZeta[n]                                     ; Eq. (18d)
-endfor
+  if keyword_set(resolution) then begin
+     w = where(total(abs(ab), 1) gt resolution, ngood)
+     if ngood ge 1 then $
+        ab = ab[*,0:w[-1]]
+  endif
 
-; Scattering coefficients
-n = dindgen(nmax + 1)
-ab[0, *] = ((Ha[-1, *]/m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
-           ((Ha[-1, *]/m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (5)
-ab[1, *] = ((Hb[-1, *]*m[-1] + n/x[-1]) * Psi  - shift(Psi,  1)) / $
-           ((Hb[-1, *]*m[-1] + n/x[-1]) * Zeta - shift(Zeta, 1)) ; Eq. (6)
-ab[*, 0] = dcomplex(0)
-
-if keyword_set(resolution) then begin
-   w = where(total(abs(ab), 1) gt resolution, ngood)
-   if ngood ge 1 then $
-     ab = ab[*,0:w[-1]]
-endif
-
-return, ab
+  return, ab
 end
