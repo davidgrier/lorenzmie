@@ -212,7 +212,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
 
         G1 = m[ii-1] * Hb[ii-1, n] - m[ii] * D1_am1[ii, n] ; Eq. (14)
         G2 = m[ii-1] * Hb[ii-1, n] - m[ii] * D3_am1[ii, n] ; Eq. (15)
-        Hb[ii, n] = (G2 * D1_a[ii, n] - G1 * Q1[ii, n] * D3_a[ii, n]) / $
+        Hb[ii, n] = (G2 * D1_a[ii, n] - G1 * Q[ii, n] * D3_a[ii, n]) / $
                     (G2 - G1 * Q[ii, n]) ; Eq. (8b)
      endfor
   endfor                        ;ii (layers)
