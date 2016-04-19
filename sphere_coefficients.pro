@@ -1,37 +1,38 @@
+; docformat = 'rst'
+
 ;+
-; NAME:
-;    sphere_coefficients
+; Calculate the Lorenz-Mie scattering coefficients
+; for a multilayered sphere illuminated
+; by a coherent plane wave linearly polarized in the x direction.
 ;
-; PURPOSE:
-;    Calculates the Mie scattering coefficients
-;    for a multilayered sphere illuminated
-;    by a coherent plane wave linearly polarized in the x direction.
+; :Examples:
+;    IDL> ab = sphere_coefficients(ap, np, nm, lambda)
 ;
-; CATEGORY:
-;    Holography, light scattering, microscopy
+;    IDL> ab = sphere_coefficients([1.0, 1.5], [1.45, 1.56], 1.3326, 0.6328)
 ;
-; CALLING SEQUENCE:
-;    ab = sphere_coefficients(ap, np, nm, lambda)
-;
-; INPUTS:
-;    ap: [nlayers] radii of layered sphere [micrometers]
+; :Params:
+;    ap : in, required, type=`double|doublearr(nlayers)`
+;        Radii of sphere's layers [um]
 ;        NOTE: ap and np are reordered automatically so that
 ;        ap is in ascending order.
 ;
-;    np: [nlayers] (complex) refractive indexes of sphere's layers
+;    np : in, required, type=`dcomplex|dcomplexarr(nlayers)`
+;        Refractive indexes of sphere's layers
 ;
-;    nm: (complex) refractive index of medium
+;    nm : in, required, type=dcomplex
+;        Refractive index of medium
 ;
-;    lambda: wavelength of light [micrometers]
+;    lambda : in, required, type=double
+;        Wavelength of light [micrometers]
 ;
-; OUTPUTS:
+; :Returns:
 ;    ab: [2,nc] complex a and b scattering coefficients.
 ;
-; KEYWORDS:
-;    resolution: minimum magnitude of Lorenz-Mie coefficients to retain.
-;         Default: See references.
+; :Keywords:
+;    resolution : in, optional, type=double, default=`See references`
+;        Minimum magnitude of Lorenz-Mie coefficients to retain.
 ;
-; REFERENCES:
+; :References:
 ; 1. Adapted from Chapter 8 in
 ;    C. F. Bohren and D. R. Huffman, 
 ;    Absorption and Scattering of Light by Small Particles,
@@ -51,38 +52,45 @@
 ;    Improved Mie scattering algorithms,
 ;    Applied Optics 19, 1505-1509 (1980).
 ;
-; EXAMPLE: 
-;  ab = sphere_coefficients([1.0, 1.5], [1.45, 1.56], 1.3326, 0.6328)
-;   
-; MODIFICATION HISTORY:
+; :History:
 ; Replaces sphere_coefficients.pro, which calculated scattering
 ;    coefficients for a homogeneous sphere.  This earlier version
 ;    was written by Bo Sun and David G. Grier, and was based on
 ;    algorithms by W. J. Wiscombe (1980) and W. J. Lentz (1976).
 ;
 ; 10/31/2010 Written by F. C. Cheong, New York University
+;
 ; 11/02/2010 David G. Grier (NYU) Formatting.  Explicit casts 
 ;    to double precision.  Use complex functions.
+;
 ; 04/10/2011 DGG Cleaned up Nstop code.  Use array math rather than
 ;    iteration where convenient.  Eliminate an and bn subroutines.
 ;    Simplify function names.  Use IDL 8 array notation.  Fixed
 ;    bug in bn coefficients for multilayer spheres.
+;
 ; 05/31/2011 DGG Fixed corner condition in Nstop code.
+;
 ; 09/04/2011 DGG Added RESOLUTION keyword
+;
 ; 01/26/2013 DGG Calculate x with real part of nm
+;
 ; 07/22/2013 DGG RESOLUTION retains up to last coefficient
 ;    with sufficiently large magnitude.
+;
 ; 04/19/2016 DGG Substantial overhaul to streamline implementation.
 ;
-; Copyright (c) 2010-2016 F. C. Cheong and D. G. Grier
+; :Author:
+;    Fook C. Cheong and David G. Grier
+;
+; :Copyright:
+;    Copyright (c) 2010-2016 F. C. Cheong and D. G. Grier
 ;- 
 
-;;;;;
-;
-; Nstop
-;
+;+
 ; Number of terms to keep in the partial wave expansion
 ;
+; :Hidden:
+;-
 function Nstop, x, m
 
   COMPILE_OPT IDL2, HIDDEN
@@ -100,10 +108,9 @@ function Nstop, x, m
   return, double(floor(max([ns, abs(x*m), abs(shift(x, -1)*m)])) + 15)
 end
 
-;;;;;
-;
+;+
 ; sphere_coefficients
-;
+;-
 function sphere_coefficients, ap, np, nm, lambda, $
                               resolution = resolution
 
