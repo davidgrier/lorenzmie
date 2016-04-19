@@ -84,20 +84,19 @@
 ;
 function Nstop, x, m
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-;;; Wiscombe (1980)
-xl = x[-1]
-if xl lt 8. then $
-   ns = floor(xl + 4. * xl^(1./3.) + 1.) $
-else if xl lt 4200. then $
-   ns = floor(xl + 4.05 * xl^(1./3.) + 2.) $
-else if xl gt 4199. then $
-   ns = floor(xl + 4. * xl^(1./3.) + 2.)
+  ;; Wiscombe (1980)
+  xl = x[-1]
+  if xl lt 8. then $
+     ns = floor(xl + 4. * xl^(1./3.) + 1.) $
+  else if xl lt 4200. then $
+     ns = floor(xl + 4.05 * xl^(1./3.) + 2.) $
+  else if xl gt 4199. then $
+     ns = floor(xl + 4. * xl^(1./3.) + 2.)
 
-;;; Yang (2003) Eq. (30)
-return, double(floor(max([ns, abs(x*m), abs(shift(x, -1)*m)])) + 15)
-
+  ;; Yang (2003) Eq. (30)
+  return, double(floor(max([ns, abs(x*m), abs(shift(x, -1)*m)])) + 15)
 end
 
 ;;;;;
@@ -136,20 +135,20 @@ function sphere_coefficients, ap, np, nm, lambda, $
   D1_am1 = dcomplexarr(nlayers, nmax+2)
 
   D3     = dcomplexarr(nmax+1)
-  D3_a   = dcomplexarr(nlayers, nmax+1, /nozero)
+  D3_a   = dcomplexarr(nlayers, nmax+1)
   D3_am1 = dcomplexarr(nlayers, nmax+1)
   
   Psi         = dcomplexarr(nmax+1) 
   Zeta        = dcomplexarr(nmax+1) 
   PsiZeta     = dcomplexarr(nmax+1) 
-  PsiZeta_a   = dcomplexarr(nlayers, nmax+1, /nozero) 
+  PsiZeta_a   = dcomplexarr(nlayers, nmax+1) 
   PsiZeta_am1 = dcomplexarr(nlayers, nmax+1) 
 
   Q  = dcomplexarr(nlayers, nmax+1) 
   Ha = dcomplexarr(nlayers, nmax+1) 
   Hb = dcomplexarr(nlayers, nmax+1) 
 
-  ;;; Fields in the sphere's core
+  ;;; Iterate outward from the sphere's core
   z1 = x[0] * m[0]
 
   ; D1_a[0, nmax + 1] = dcomplex(0) ; Eq. (16a)
