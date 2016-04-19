@@ -224,14 +224,14 @@ function sphere_coefficients, ap, np, nm, lambda, $
      D1[n-1] = dn/xL - (1.d/(D1[n] + dn/xL)) ; Eq. (16b)
   endfor
 
-  Psi[0]     = sin(xL)                         ; Eq. (20a)
-  Zeta[0]    = -ci * exp(ci * xL)              ; Eq. (21a)
+  Psi[0]     = sin(xL)                           ; Eq. (20a)
+  Zeta[0]    = -ci * exp(ci * xL)                ; Eq. (21a)
   PsiZeta[0] = 0.5d * (1.d - exp(2.d * ci * xL)) ; Eq. (18a)
   D3[0] = ci                                     ; Eq. (18b)
   for n = 1, nmax do begin      ; Upward recurrence for Psi, Zeta, PsiZeta and D3
      dn = double(n)
-     Psi[n]  = Psi[n-1]  * (dn/xL - D1[n-1])                         ; Eq. (20b)
-     Zeta[n] = Zeta[n-1] * (dn/xL - D3[n-1])                         ; Eq. (21b)
+     Psi[n]  = Psi[n-1]  * (dn/xL - D1[n-1])                           ; Eq. (20b)
+     Zeta[n] = Zeta[n-1] * (dn/xL - D3[n-1])                           ; Eq. (21b)
      PsiZeta[n] = PsiZeta[n-1] * (dn/xL - D1[n-1]) * (dn/xL - D3[n-1]) ; Eq. (18c)
      D3[n] = D1[n] + ci/PsiZeta[n]                                     ; Eq. (18d)
   endfor
