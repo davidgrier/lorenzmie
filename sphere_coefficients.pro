@@ -52,32 +52,30 @@
 ;    Improved Mie scattering algorithms,
 ;    Applied Optics 19, 1505-1509 (1980).
 ;
+; 5. A. A. R. Neves and D. Pisignano,
+;    Effect of finite terms on the truncation error of Mie series,
+;    Optics Letters 37, 2481-2420 (2012).
+;
 ; :History:
 ; Replaces sphere_coefficients.pro, which calculated scattering
 ;    coefficients for a homogeneous sphere.  This earlier version
 ;    was written by Bo Sun and David G. Grier, and was based on
 ;    algorithms by W. J. Wiscombe (1980) and W. J. Lentz (1976).
-;
 ; 10/31/2010 Written by F. C. Cheong, New York University
-;
 ; 11/02/2010 David G. Grier (NYU) Formatting.  Explicit casts 
 ;    to double precision.  Use complex functions.
-;
 ; 04/10/2011 DGG Cleaned up Nstop code.  Use array math rather than
 ;    iteration where convenient.  Eliminate an and bn subroutines.
 ;    Simplify function names.  Use IDL 8 array notation.  Fixed
 ;    bug in bn coefficients for multilayer spheres.
-;
 ; 05/31/2011 DGG Fixed corner condition in Nstop code.
-;
 ; 09/04/2011 DGG Added RESOLUTION keyword
-;
 ; 01/26/2013 DGG Calculate x with real part of nm
-;
 ; 07/22/2013 DGG RESOLUTION retains up to last coefficient
 ;    with sufficiently large magnitude.
-;
 ; 04/19/2016 DGG Substantial overhaul to streamline implementation.
+; 04/21/2016 DGG Corrections to b coefficients.  Commit Neves stopping
+;    criterion.
 ;
 ; :Author:
 ;    Fook C. Cheong and David G. Grier
@@ -88,10 +86,24 @@
 
 ;+
 ; Number of terms to keep in the partial wave expansion
+; according to Neves and Pisignano (2012), Eq. (9).
 ;
 ; :Hidden:
 ;-
-function Nstop, x, m
+function neves_pisignano, x, epsilon
+
+  COMPILE_OPT IDL2, HIDDEN
+
+  return, floor(x + 0.76*(epsilon^2*x)^(1./3) - 4.1)
+end
+
+;+
+; Number of terms to keep in the partial wave expansion
+; according to Wiscombe (1980) and Yang (2003).
+;
+; :Hidden:
+;-
+function wiscombe_yang, x, m
 
   COMPILE_OPT IDL2, HIDDEN
 
@@ -105,14 +117,15 @@ function Nstop, x, m
      ns = floor(xl + 4. * xl^(1./3.) + 2.)
 
   ;; Yang (2003) Eq. (30)
-  return, double(floor(max([ns, abs(x*m), abs(shift(x, -1)*m)])) + 15)
+  return, floor(max([ns, abs(x*m), abs(shift(x, -1)*m)])) + 15
 end
 
 ;+
 ; sphere_coefficients
 ;-
 function sphere_coefficients, ap, np, nm, lambda, $
-                              resolution = resolution
+                              resolution = resolution, $
+                              wiscombe = wiscombe
 
   COMPILE_OPT IDL2
 
@@ -131,7 +144,10 @@ function sphere_coefficients, ap, np, nm, lambda, $
   x = 2.d * !dpi * real_part(nm) * ap / lambda ; size parameter
   m = dcomplex(np/nm)                          ; relative refractive index
 
-  nmax = Nstop(x, m)            ; number of terms in partial-wave expansion
+  ;; number of terms in partial-wave expansion
+  nmax = ~keyword_set(wiscombe) && isa(resolution, /number, /scalar) ? $
+     neves_pisignano(x, -alog10(resolution)) : $
+     wiscombe_yang(x, m)
 
   ci = dcomplex(0, 1)
 
@@ -193,8 +209,8 @@ function sphere_coefficients, ap, np, nm, lambda, $
      G2 = m[ii] * Ha - m[ii-1] * D3_z2                  ; Eq. (13)
      Ha = (G2 * D1_z1 - Q * G1 * D3_z1) / (G2 - G1 * Q) ; Eq. (7b)
      
-     G1 = m[ii] * Hb - m[ii-1] * D1_z2                  ; Eq. (14)
-     G2 = m[ii] * Hb - m[ii-1] * D3_z2                  ; Eq. (15)
+     G1 = m[ii-1] * Hb - m[ii] * D1_z2                  ; Eq. (14)
+     G2 = m[ii-1] * Hb - m[ii] * D3_z2                  ; Eq. (15)
      Hb = (G2 * D1_z1 - Q * G1 * D3_z1) / (G2 - G1 * Q) ; Eq. (8b)
   endfor
 
@@ -221,12 +237,13 @@ function sphere_coefficients, ap, np, nm, lambda, $
   fac = Ha/m[-1] + n/x[-1]
   ab[0, *] = (fac * Psi  - shift(Psi,  1)) / $
              (fac * Zeta - shift(Zeta, 1)) ; Eq. (5)
-  fac = Hb/m[-1] + n/x[-1]
+  
+  fac = m[-1]*Hb + n/x[-1]
   ab[1, *] = (fac * Psi  - shift(Psi,  1)) / $
              (fac * Zeta - shift(Zeta, 1)) ; Eq. (6)
   ab[*, 0] = dcomplex(0)
 
-  if keyword_set(resolution) then begin
+  if keyword_set(wiscombe) && isa(resolution, /number, /scalar) then begin
      w = where(total(abs(ab), 1) gt resolution, ngood)
      if ngood ge 1 then $
         ab = ab[*,0:w[-1]]
