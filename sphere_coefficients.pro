@@ -94,7 +94,7 @@ function neves_pisignano, x, epsilon
 
   COMPILE_OPT IDL2, HIDDEN
 
-  return, floor(x + 0.76*(epsilon^2*x)^(1./3) - 4.1)
+  return, floor(x + 0.44*(x * (alog(epsilon))^2)^(1./3) - 4.1)
 end
 
 ;+
@@ -124,8 +124,8 @@ end
 ; sphere_coefficients
 ;-
 function sphere_coefficients, ap, np, nm, lambda, $
-                              resolution = resolution, $
-                              wiscombe = wiscombe
+                              resolution = resolution_, $
+                              wiscombe = wiscombe_
 
   COMPILE_OPT IDL2
 
@@ -133,6 +133,9 @@ function sphere_coefficients, ap, np, nm, lambda, $
 
   if n_elements(np) ne nlayers then $
      message, "ap and np must have the same number of elements"
+
+  resolution = isa(resolution_, /number, /scalar) ? float(resolution_) : 0.
+  wiscombe = keyword_set(wiscombe_) || (resolution le 0)
 
   ;; arrange shells in size order
   if nlayers gt 1 then begin
@@ -145,9 +148,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
   m = dcomplex(np/nm)                          ; relative refractive index
 
   ;; number of terms in partial-wave expansion
-  nmax = ~keyword_set(wiscombe) && isa(resolution, /number, /scalar) ? $
-     neves_pisignano(x, -alog10(resolution)) : $
-     wiscombe_yang(x, m)
+  nmax = (wiscombe) ? wiscombe_yang(x, m) : neves_pisignano(x, resolution)
 
   ci = dcomplex(0, 1)
 
@@ -243,7 +244,7 @@ function sphere_coefficients, ap, np, nm, lambda, $
              (fac * Zeta - shift(Zeta, 1)) ; Eq. (6)
   ab[*, 0] = dcomplex(0)
 
-  if keyword_set(wiscombe) && isa(resolution, /number, /scalar) then begin
+  if (wiscombe) && (resolution gt 0.) then begin
      w = where(total(abs(ab), 1) gt resolution, ngood)
      if ngood ge 1 then $
         ab = ab[*,0:w[-1]]
