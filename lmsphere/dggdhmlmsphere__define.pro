@@ -332,7 +332,7 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
      self.rp[1] = double(yp)
   if (doupdate or= isa(zp, /scalar, /number)) then $
      self.rp[2] = double(zp)
-  if (doupdate or= (n_elements(rp) eq 3))) then $
+  if (doupdate or= (n_elements(rp) eq 3)) then $
      self.rp = double(rp)
   if doupdate then $
      self.UpdateGeometry
