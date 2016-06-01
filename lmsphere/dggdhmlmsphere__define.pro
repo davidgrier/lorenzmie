@@ -123,9 +123,9 @@
 ;    to provide alternative geommetries.
 ; 03/08/2015 DGG remove GPU code.  The idea is to implement
 ;    all acceleration modes by subclassing the base class.
+; 06/01/2016 DGG allow ap and np to be arrays for stratified spheres.
 ;
 ; NOTES:
-; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
 ; Allow for indexing points -- calculate only at specified points
 ; Use masking to handle deinterlacing.
@@ -298,8 +298,8 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
                                  yp = yp, $
                                  zp = zp, $
                                  rp = rp, $
-                                 ap = ap, $
-                                 np = np, $
+                                 ap = ap_, $
+                                 np = np_, $
                                  kp = kp, $
                                  nm = nm, $
                                  km = km, $
@@ -357,18 +357,21 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
      self.ab = ptr_new(dcomplex(ab))
   endif
 
-  if isa(ap, /scalar, /number) then begin
-     self.ap = double(ap)
+  if isa(ap_, /number) then begin
+     ap = double(ap_)
+     self.ap = ptr_new(ap, /no_copy)
      newcoeffs = 1B
   endif
 
-  if isa(np, /scalar, /number) then begin
-     self.np = dcomplex(np)
+  if isa(np_, /number) then begin
+     np = dcomplex(np_)
+     self.np = ptr_new(np, /no_copy)
      newcoeffs = 1B
   endif
 
   if isa(kp, /scalar, /number) then begin
-     self.np = dcomplex(real_part(self.np), kp)
+     np = dcomplex(real_part(*self.np), kp)
+     self.np = ptr_new(np, /no_copy)
      newcoeffs = 1B
   endif
 
@@ -396,7 +399,7 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
 
   ;;; compute new Lorenz-Mie coefficients, if necessary
   if (newcoeffs) then begin
-     ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, resolution = self.resolution)
+     ab = sphere_coefficients(*self.ap, *self.np, self.nm, self.lambda, resolution = self.resolution)
      self.ab = ptr_new(ab, /no_copy)
   endif
 
@@ -444,8 +447,8 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
   if arg_present(xp) then xp = self.rp[0]
   if arg_present(yp) then yp = self.rp[1]
   if arg_present(zp) then zp = self.rp[2]
-  if arg_present(ap) then ap = self.ap
-  if arg_present(np) then np = self.np
+  if arg_present(ap) then ap = *self.ap
+  if arg_present(np) then np = *self.np
   if arg_present(kp) then kp = imaginary(self.np)
   if arg_present(nm) then nm = self.nm
   if arg_present(km) then km = imaginary(self.nm)
@@ -510,8 +513,8 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                yp = yp,         $
                                zp = zp,         $
                                rp = rp,         $ ; 3D position [pixel]
-                               ap = ap,         $ ; sphere radius [um]
-                               np = np,         $ ; sphere refractive index
+                               ap = ap_,        $ ; sphere radius [um]
+                               np = np_,        $ ; sphere refractive index
                                nm = nm,         $ ; medium refractive index
                                resolution = resolution, $ ; resolution for Lorenz-Mie coefficients
                                alpha = alpha,   $ ; relative illumination amplitude
@@ -566,9 +569,15 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
   if isa(zp, /scalar, /number) then $
      self.rp[2] = double(zp)
 
-  self.ap = isa(ap, /scalar, /number) ? double(ap) : 1.d
+  ap = isa(ap_, /number) ? double(ap_) : 1.d
+  self.ap = ptr_new(ap, /no_copy)
 
-  self.np = isa(np, /scalar, /number) ? dcomplex(np) : dcomplex(1.4)
+  np = isa(np_, /number) ? dcomplex(np_) : dcomplex(1.4)
+  if n_elements(np) ne n_elements(*self.ap) then begin
+     message, 'ap and np should have same number of elements', /inf
+     return, 0B
+  endif
+  self.np = ptr_new(np, /no_copy)
 
   self.nm = isa(nm, /scalar, /number) ? dcomplex(nm) : dcomplex(1.3)
 
@@ -580,7 +589,7 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
 
   self.resolution = isa(resolution, /scalar, /number) ? double(resolution) : 0
 
-  ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, $
+  ab = sphere_coefficients(*self.ap, *self.np, self.nm, self.lambda, $
                            resolution = self.resolution)
   self.ab = ptr_new(ab)
 
@@ -612,6 +621,12 @@ pro DGGdhmLMSphere::Cleanup
   
   if ptr_valid(self.geometry) then $
      ptr_free, self.geometry
+
+  if ptr_valid(self.ap) then $
+     ptr_free, self.ap
+
+  if ptr_valid(self.np) then $
+     ptr_free, self.np
 end
 
 ;;;;
@@ -635,8 +650,8 @@ pro DGGdhmLMSphere__define
             coordinates: ptr_new(),    $ ; Cartesian coordinates of pixels
             geometry:    ptr_new(),    $ ; local copy of preallocated variables
             rp:          dblarr(3),    $ ; 3D position [pixel]
-            ap:          0.D,          $ ; sphere radius [um]
-            np:          dcomplex(0.), $ ; sphere refractive index
+            ap:          ptr_new(),    $ ; sphere radius [um]
+            np:          ptr_new(), $ ; sphere refractive index
             nm:          dcomplex(0.), $ ; medium refractive index
             alpha:       0.D,          $ ; relative illumination amplitude
             delta:       0.D,          $ ; illumination wavefront distortion
