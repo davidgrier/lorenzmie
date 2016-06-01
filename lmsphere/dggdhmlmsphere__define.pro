@@ -39,7 +39,6 @@
 ;    [ GS] DELTA: wavefront distortion [pixel]
 ; 
 ;    [ G ] HOLOGRAM: real-valued computed holographic image
-;    [ G ] FIELD:    complex-valued scattered field
 ;    [ GS] AB:       Generalized Lorenz-Mie scattering coefficients
 ;    [ GS] RESOLUTION: Resolution of Lorenz-Mie coefficients.
 ;                      0: Full resolution
@@ -50,8 +49,6 @@
 ;        Compute either the even (DEINTERLACE = 2) or
 ;        odd (DEINTERLACE = 1) field of an interlaced hologram.
 ;        Default: Return the full hologram.
-;    NOZ: (Initialization)
-;        Eliminate z-component of scattered field from intensity calculation.
 ;
 ; METHODS:
 ;    GetProperty: Get accessible properties
@@ -414,7 +411,6 @@ end
 ; Retrieve the value of properties associated with the hologram
 ;
 pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
-                                 field = field, $
                                  dim = dim, $
                                  ab = ab, $
                                  resolution = resolution, $
@@ -519,8 +515,7 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                resolution = resolution, $ ; resolution for Lorenz-Mie coefficients
                                alpha = alpha,   $ ; relative illumination amplitude
                                delta = delta,   $ ; illumination wavefront distortion
-                               deinterlace = deinterlace, $
-                               noz = noz          ; eliminate z-component of field
+                               deinterlace = deinterlace
 
   COMPILE_OPT IDL2, HIDDEN
 
@@ -555,7 +550,6 @@ function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
   self.r0 = isa(r0, /number, /array) ? double(r0) : [0.d, 0]
 
   self.CreateGeometry
-  self.noz = keyword_set(noz)
   
   ;;; Optional inputs
   self.rp = (n_elements(rp) eq 3) ? double(rp) : [dim/2, 100.]
@@ -642,7 +636,6 @@ pro DGGdhmLMSphere__define
   struct = {DGGdhmLMSphere,            $
             INHERITS     IDL_OBJECT,   $
             hologram:    ptr_new(),    $ ; computed hologram
-            field:       ptr_new(),    $ ; scattered field
             dim:         [0L, 0L],     $ ; dimensions of hologram
             r0:          [0.d, 0],     $ ; coordinates of lower-left corner
             ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
@@ -659,7 +652,6 @@ pro DGGdhmLMSphere__define
             lambda:      0.D,          $ ; vacuum wavelength [um]
             k:           0.D,          $ ; wavenumber in medium [pixel^-1]
             deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
-            noz:         0,            $ ; flag: if set, ignore z-component of field
             nx:          0L,           $ ; width of deinterlaced hologram
             ny:          0L            $ ; height of deinterlaced hologram
          }
