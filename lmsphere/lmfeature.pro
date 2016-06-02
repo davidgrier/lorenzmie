@@ -395,7 +395,7 @@ refit:
         rho = findgen(range) + 0.5
         lap = deriv(aa)         ; Laplacian of azimuthal profile
         lap = deriv(lap) + lap/rho
-        w = where((abs(aa-1.) gt 1e-2) && (abs(lap) gt 1e-2))
+        w = where(((abs(aa-1.) gt noise) and (abs(lap) gt noise)))
         qsq = -lap[w]/(aa[w] - 1.) 
         zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
         w = where(zsq gt 0., ngood)

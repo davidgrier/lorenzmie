@@ -334,8 +334,7 @@ obj = DGGdhmLMSphere(dim = [nx, ny], $
                      alpha = p0[8], $
                      delta = p0[9], $
                      deinterlace = deinterlace, $
-                     resolution = resolution, $
-                     gpu = gpu $
+                     resolution = resolution $
                     )
 
 if ~isa(obj, 'DGGdhmLMSphere') then begin
