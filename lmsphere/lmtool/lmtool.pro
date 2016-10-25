@@ -509,7 +509,7 @@ pro lmtool, a, lambda, mpp, nm = nm, deinterlace = deinterlace, smooth = smooth
 
 COMPILE_OPT IDL2
 
-umsg = 'USAGE: dgglmtool, a, lambda, mpp'
+umsg = 'USAGE: lmtool, a, lambda, mpp'
 
 if n_params() ne 3 then begin
    message, umsg, /inf
