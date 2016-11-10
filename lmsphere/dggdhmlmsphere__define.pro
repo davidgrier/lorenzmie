@@ -121,13 +121,15 @@
 ; 03/08/2015 DGG remove GPU code.  The idea is to implement
 ;    all acceleration modes by subclassing the base class.
 ; 06/01/2016 DGG allow ap and np to be arrays for stratified spheres.
+; 11/10/2016 Mark Hannel and David B. Ruffner Account for particles
+;    below the focal plane.
 ;
 ; NOTES:
 ; Integrate sphere_coefficient code?
 ; Allow for indexing points -- calculate only at specified points
 ; Use masking to handle deinterlacing.
 ; 
-; Copyright (c) 2011-2016 David G. Grier
+; Copyright (c) 2011-2016 Mark Hannel, David B. Ruffner and David G. Grier
 ;-    
 
 ;;;;
@@ -146,7 +148,8 @@ pro DGGdhmLMSphere::UpdateGeometry
   (*v).x = (*coordinates).x - self.rp[0]
   (*v).y = (*coordinates).y - self.rp[1]
   
-  z = self.rp[2] > 1.d
+;  z = self.rp[2] > 1.d ;;; WHY? DGG 11/10/16
+  z = self.rp[2]
   
 ; convert to spherical coordinates centered on the sphere.
 ; (r, theta, phi) is the spherical coordinate of the pixel
@@ -155,7 +158,8 @@ pro DGGdhmLMSphere::UpdateGeometry
   (*v).rho   = sqrt((*v).x^2 + (*v).y^2)
   (*v).kr    = sqrt((*v).rho^2 + z^2)
   (*v).costheta = z/(*v).kr
-  (*v).sintheta = (*v).rho/(*v).kr
+  (*v).sintheta = ((*v).kr gt 1d-6) ? $
+                  (*v).rho/(*v).kr : 0.d
   phi   = atan((*v).y, (*v).x)
   (*v).cosphi = cos(phi)
   (*v).sinphi = sin(phi)
@@ -189,8 +193,16 @@ pro DGGdhmLMSphere::Compute
 
   ;; starting points for recursive function evaluation ...
   ;; ... Riccati-Bessel radial functions, page 478
-  xi_nm2 = dcomplex((*v).coskr, (*v).sinkr) ; \xi_{-1}(kr)
-  xi_nm1 = dcomplex((*v).sinkr,-(*v).coskr) ; \xi_0(kr)
+  ;; Particles above the focal plane create diverging waves
+  ;; described by Eq. (4.13) for $h_n^{(1)}(kr)$.  These have z > 0.
+  ;; Those below the focal plane appear to be converging
+  ;; from the perspective of the camera.  They are described
+  ;; by Eq. (4.14) for $h_n^{(2)}(kr)$, and have z < 0.
+  ;; We can select the appropriate case by applying the correct
+  ;; sign of the imaginary part of the starting functions ...
+  sgn = signum(self.rp[2]) ; particle above (+1) or below (-1) the focal plane
+  xi_nm2 = dcomplex((*v).coskr, sgn*(*v).sinkr) ; \xi_{-1}(kr)
+  xi_nm1 = dcomplex((*v).sinkr,-sgn*(*v).coskr) ; \xi_0(kr)
 
   ;; ... angular functions (4.47), page 95
   pi_nm1 = 0.d                  ; \pi_0(\cos\theta)
