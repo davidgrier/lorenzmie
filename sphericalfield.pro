@@ -86,9 +86,13 @@
 ; 06/18/2010 DGG Added COMPILE_OPT.
 ; 09/04/2011 DGG Compute -\tau_n rather than \tau_n
 ; 01/13/2013 DGG Documentation fixes and formatting.
-; 03/17/2013 DGG Small algebraic rearrangements for computational efficiency.
+; 03/17/2013 DGG Small algebraic rearrangements for computational
+; efficiency.
+; 10/11/2016 Mark Hannel and David B. Ruffner Account for particles
+; below the focal plane.
 ;
-; Copyright (c) 2007-2013 Bo Sun and David G. Grier
+; Copyright (c) 2007-2016 Bo Sun, David G. Grier, Mark Hannel and
+; David B. Ruffner.
 ;-
 
 function sphericalfield, x_, y_, z_, ab, lambda, $
@@ -122,8 +126,16 @@ kr = k*r                        ; reduced radial coordinate
 ; ... Riccati-Bessel radial functions, page 478
 sinkr = sin(kr)
 coskr = cos(kr)
-xi_nm2 = dcomplex(coskr, sinkr) ; \xi_{-1}(kr)
-xi_nm1 = dcomplex(sinkr,-coskr) ; \xi_0(kr)
+; Particles above the focal plane create diverging waves
+; described by Eq. (4.13) for $h_n^{(1)}(kr)$.  These have z > 0.
+; Those below the focal plane appear to be converging
+; from the perspective of the camera.  They are described
+; by Eq. (4.14) for $h_n^{(2)}(kr)$, and have z < 0.
+; We can select the appropriate case by applying the correct
+; sign of the imaginary part of the starting functions ...
+sgn = signum(z_)
+xi_nm2 = dcomplex(coskr, sgn*sinkr) ; \xi_{-1}(kr) 
+xi_nm1 = dcomplex(sinkr,-sgn*coskr) ; \xi_0(kr)
 
 ; ... angular functions (4.47), page 95
 pi_nm1 = 0.d                    ; \pi_0(\cos\theta)
