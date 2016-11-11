@@ -156,10 +156,9 @@ pro DGGdhmLMSphere::UpdateGeometry
 ; at (x,y) in the imaging plane at distance z from the
 ; center of the sphere.
   (*v).rho   = sqrt((*v).x^2 + (*v).y^2)
-  (*v).kr    = sqrt((*v).rho^2 + z^2)
+  (*v).kr    = sqrt((*v).rho^2 + z^2) > 1.d-6
   (*v).costheta = z/(*v).kr
-  (*v).sintheta = ((*v).kr gt 1d-6) ? $
-                  (*v).rho/(*v).kr : 0.d
+  (*v).sintheta = (*v).rho/(*v).kr
   phi   = atan((*v).y, (*v).x)
   (*v).cosphi = cos(phi)
   (*v).sinphi = sin(phi)
@@ -341,8 +340,9 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
      self.rp[1] = double(yp)
   if (doupdate or= isa(zp, /scalar, /number)) then $
      self.rp[2] = double(zp)
-  if (doupdate or= (isa(rp, /number, /array) && (n_elements(rp) eq 3))) then $
-     self.rp = double(rp)
+  if (doupdate or= (isa(rp, /number, /array))) then $
+     if n_elements(rp) eq 3 then $
+        self.rp = double(rp)
   if doupdate then $
      self.UpdateGeometry
 
