@@ -156,7 +156,7 @@ pro DGGdhmLMSphere::UpdateGeometry
 ; at (x,y) in the imaging plane at distance z from the
 ; center of the sphere.
   (*v).rho   = sqrt((*v).x^2 + (*v).y^2)
-  (*v).kr    = sqrt((*v).rho^2 + z^2) > 1.d-6
+  (*v).kr    = sqrt((*v).rho^2 + z^2) > 1.d-6 ; prevent rare divergences
   (*v).costheta = z/(*v).kr
   (*v).sintheta = (*v).rho/(*v).kr
   phi   = atan((*v).y, (*v).x)
