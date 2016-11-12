@@ -30,6 +30,9 @@
 ;    rp: [2,npts] array of initial position estimates
 ;        Default: estimated from image with ctfeature().
 ;
+;    zp: ballpark height of sphere(s) above focal plane [pixels].
+;        Default: estimated from image for each feature.
+;
 ;    ap: ballpark radius of sphere [micrometers]
 ;        Default: estimated from image
 ;
@@ -170,9 +173,11 @@
 ; ap.
 ; 12/12/2013 DGG Updated for new version of ctfeature.
 ; 04/24/2014 DGG Specify RP as an option.
+; 11/20/2015 DGG and Mark Hannel Avoid divergences in zp estimate.
+; 03/28/2016 DGG and Mark Hannel Specify zp on input.
 ;
-; Copyright (c) 2008-2014 David G. Grier, Bhaskar Jyoti Krishnatreya,
-;    David Ruffner and Fook Chiong Cheong
+; Copyright (c) 2008-2016 David G. Grier, Bhaskar Jyoti Krishnatreya,
+;    David Ruffner, Fook Chiong Cheong and Mark Hannel
 ;-
 ;;;;;
 ;
@@ -182,18 +187,18 @@
 ;
 pro lmf_report, msg, p
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-message, msg, /inf
-message, string(p[0:2], $
-                format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
-message, string(p[3:4], $
-                format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
-message, string(p[8:9], $
-                format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
-message, /inf
+  message, msg, /inf
+  message, string(p[0:2], $
+                  format = '("  rp = (",F0.2,", ",F0.2,", ",F0.2,")")'), /inf
+  message, string(p[3:4], $
+                  format = '("  ap = ",F0.3," um, np = ",F0.3)'), /inf
+  message, string(p[8:9], $
+                  format = '("  alpha = ",F0.3,", delta = ",F0.3)'), /inf
+  message, /inf
 
-return
+  return
 end
 
 ;;;;;
@@ -210,6 +215,7 @@ function lmfeature, a, lambda, mpp, $
                     pickn = pickn, $
                     count = count, $
                     rp = rp, $
+                    zp = zp_, $
                     ap = ap, $
                     fixap = fixap, $
                     np = np0, $
@@ -226,284 +232,290 @@ function lmfeature, a, lambda, mpp, $
                     quiet = quiet, $
                     debug = debug
 
-COMPILE_OPT IDL2
+  COMPILE_OPT IDL2
 
-umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
+  umsg = 'USAGE: p = lmfeature(a, lambda, mpp)'
 
-features = list()
+  features = list()
 
-;;; Process command line parameters
-if n_params() ne 3 then begin
-   message, umsg, /inf
-   return, features
-endif
+  ;;; Process command line parameters
+  if n_params() ne 3 then begin
+     message, umsg, /inf
+     return, features
+  endif
 
-sz = size(a)
-if ~isa(a, /number, /array) or sz[0] ne 2 then begin
-   message, umsg, /inf
-   message, 'A must be a two-dimensional normalized hologram', /inf
-   return, features
-endif
-maxx = sz[1]-1
-maxy = sz[2]-1
+  sz = size(a)
+  if ~isa(a, /number, /array) or sz[0] ne 2 then begin
+     message, umsg, /inf
+     message, 'A must be a two-dimensional normalized hologram', /inf
+     return, features
+  endif
+  maxx = sz[1]-1
+  maxy = sz[2]-1
 
-if ~isa(lambda, /number, /scalar) then begin
-   message, umsg, /inf
-   message, 'LAMBDA must be a number', /inf
-   return, features
-endif
+  if ~isa(lambda, /number, /scalar) then begin
+     message, umsg, /inf
+     message, 'LAMBDA must be a number', /inf
+     return, features
+  endif
 
-if ~isa(mpp, /number, /scalar) then begin
-   message, umsg, /inf
-   message, 'MPP must be a number', /inf
-   return, features
-endif
+  if ~isa(mpp, /number, /scalar) then begin
+     message, umsg, /inf
+     message, 'MPP must be a number', /inf
+     return, features
+  endif
 
-if ~isa(np0, /number, /scalar) then $
-   np0 = dcomplex(1.5d, 0.d)
+  if ~isa(np0, /number, /scalar) then $
+     np0 = dcomplex(1.5d, 0.d)
 
-if ~isa(nm0, /number, /scalar) then $
-   nm0 = refractiveindex(lambda, 24.)
+  if ~isa(nm0, /number, /scalar) then $
+     nm0 = refractiveindex(lambda, 24.)
 
-if ~isa(noise, /number, /scalar) then $
-   noise = mad(a)
+  if ~isa(noise, /number, /scalar) then $
+     noise = mad(a)
 
-k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
+  k = 2.d * !dpi * real_part(nm0) / lambda ; wavenumber [radians/um]
 
-dozp = 1                                          ; estimate axial position of each feature
-doap = ~isa(ap, /number, /scalar)                 ; estimate radius of each feature
-j0n = [2.4048, 5.5201, 8.6537, 11.7915, 14.9309] ; zeros of J0(x) used for estimating ap
+  dozp = 1                          ; estimate axial position of each feature
+  doap = ~isa(ap, /number, /scalar) ; estimate radius of each feature
+  j0n = [2.4048, 5.5201, 8.6537, 11.7915, 14.9309] ; zeros of J0(x) used for estimating ap
 ;j1n = [3.8317, 7.0156, 10.1735, 13.3237, 16.4706] ; zeros of J1(x) used for estimating ap
 
-fixalpha = keyword_set(fixalpha)
-fixdelta = keyword_set(fixdelta)
+  fixalpha = keyword_set(fixalpha)
+  fixdelta = keyword_set(fixdelta)
 
-gpu = keyword_set(gpu)
+  gpu = keyword_set(gpu)
 
-doreport = ~keyword_set(quiet)
-dographics = arg_present(graphics) || keyword_set(graphics)
-if dographics then begin
-   if isa(graphics, 'lmfgraphics') then $
-      graphics.im -> putdata, deinterlace(a, deinterlace) $
-   else begin
-      im = image(deinterlace(a, deinterlace), axis_style = 2)
-      pf = plot([0], [0], over = im, $
-                linestyle = '', symbol = 'o', color = 'red')
-      graphics = {lmfgraphics, im:im, pf:pf}
-   endelse
-endif
+  doreport = ~keyword_set(quiet)
+  dographics = arg_present(graphics) || keyword_set(graphics)
+  if dographics then begin
+     if isa(graphics, 'lmfgraphics') then $
+        graphics.im -> putdata, deinterlace(a, deinterlace) $
+     else begin
+        im = image(deinterlace(a, deinterlace), axis_style = 2)
+        pf = plot([0], [0], over = im, $
+                  linestyle = '', symbol = 'o', color = 'red')
+        graphics = {lmfgraphics, im:im, pf:pf}
+     endelse
+  endif
 
-quiet = ~keyword_set(debug)
+  quiet = ~keyword_set(debug)
    
-;;; Find candidate features
-if ~isa(rp, /number, /array) then $
-   rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
+  ;;; Find candidate features
+  if isa(rp, /number, /array) then begin
+     nfeatures = n_elements(rp[0, *])
+     zp = rp[2, *]
+     dozp = 0
+  endif else begin
+     rp = ctfeature(a, deinterlace = deinterlace, pickn = pickn, count = nfeatures)
+     if isa(zp_, /number, /scalar) then begin
+        zp = replicate(zp_, nfeatures)
+        dozp = 0
+     endif
+  endelse
+     
+  if nfeatures le 0 then $
+     return, features
 
-if nfeatures le 0 then $
-   return, features
+  if dographics then $
+     graphics.pf -> putdata, rp[0, *], rp[1, *]
+  
+  if doreport then begin
+     print
+     message, 'noise: ' + strtrim(noise, 2), /inf
+     if keyword_set(deinterlace) then $
+        message, 'analyzing ' + ((deinterlace mod 2) ? 'odd' : 'even') + ' field', /inf
+     message, 'features found: ' + strtrim(nfeatures, 2), /inf
+  endif
+  
+  if ~isa(nfringes, /scalar, /number) then nfringes = 20
+  if ~isa(maxrefits, /scalar, /number) then maxrefits = 1
+  
+  ;;; Loop over features
+  count = 0L
+  for ndx = 0L, nfeatures - 1 do begin
+     if doreport then message, 'feature ' + strtrim(ndx, 2), /inf
 
-if dographics then $
-   graphics.pf -> putdata, rp[0, *], rp[1, *]
+     ;; Use starting estimate for particle position
+     rc = rp[0:1, ndx]
 
-if doreport then begin
-   print
-   message, 'noise: ' + strtrim(noise, 2), /inf
-   if keyword_set(deinterlace) then $
-      message, 'analyzing ' + ((deinterlace mod 2) ? 'odd' : 'even') + ' field', /inf
-   message, 'features found: ' + strtrim(nfeatures, 2), /inf
-endif
-
-if ~isa(nfringes, /scalar, /number) then nfringes = 20
-if ~isa(maxrefits, /scalar, /number) then maxrefits = 1
-
-;;; Loop over features
-count = 0L
-for ndx = 0L, nfeatures - 1 do begin
-   if doreport then message, 'feature ' + strtrim(ndx, 2), /inf
-
-   ;; Use starting estimate for particle position
-   rc = rp[0:1, ndx]
-
-   dorefit = 0
+     dorefit = 0
 refit:
+     aa = azimedian(a, center = rc, deinterlace = deinterlace, deviates = dev)
 
-   aa = azimedian(a, center = rc, deinterlace = deinterlace, deviates = dev)
-
-   ;;; analyze radial profile
-   rn = extrema(aa, ismin = ismin, count = nfound) ; coordinates of maxima and minima
-   if nfound le 1 then continue                    ; flatline: nothing here
-   w = where(rn gt 2, nfound)                      ; ignore noise near center
-   if nfound le 1 then continue
-   rn = rn[w]
-   ismin = ismin[w]
-
-   ;;; region of interest
-   if isa(rng, /number, /scalar) then $   ; range specified
-      range = long(rng) > 2 $
-   else begin                             ; range set by fringe number
-      n = nfringes < (nfound - 1)
-      range = rn[n]
-      if isa(rng, /number, /array) then $ ; constrain range to interval
-         range = range > rng[0] < rng[1]
-   endelse
+     ;;; analyze radial profile
+     rn = extrema(aa, ismin = ismin, count = nfound) ; coordinates of maxima and minima
+     if nfound le 1 then continue                    ; flatline: nothing here
+     w = where(rn gt 2, nfound)                      ; ignore noise near center
+     if nfound le 1 then continue
+     rn = rn[w]
+     ismin = ismin[w]
+     
+     ;;; region of interest
+     if isa(rng, /number, /scalar) then $ ; range specified
+        range = long(rng) > 2 $
+     else begin                 ; range set by fringe number
+        n = nfringes < (nfound - 1)
+        range = rn[n]
+        if isa(rng, /number, /array) then $ ; constrain range to interval
+           range = range > rng[0] < rng[1]
+     endelse
    
-   xc = rc[0]
-   yc = rc[1]
-   x0 = round(xc - range) > 0 < maxx
-   x1 = round(xc + range) > 0 < maxx
-   y0 = round(yc - range) > 0 < maxy
-   y1 = round(yc + range) > 0 < maxy
-   r0 = [x0, y0]                ; origin of ROI
-   roi = [x0, x1, y0, y1]
-   if dographics then begin
-      poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
-      proi = plot(poly, over = graphics.im, linestyle = '--', color = 'light green')
-   endif
+     xc = rc[0]
+     yc = rc[1]
+     x0 = round(xc - range) > 0 < maxx
+     x1 = round(xc + range) > 0 < maxx
+     y0 = round(yc - range) > 0 < maxy
+     y1 = round(yc + range) > 0 < maxy
+     r0 = [x0, y0]              ; origin of ROI
+     roi = [x0, x1, y0, y1]
+     if dographics then begin
+        poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
+        proi = plot(poly, over = graphics.im, linestyle = '--', color = 'light green')
+     endif
 
-   ;;; cropped and deinterlaced iamge
-   aa = aa[0:range]
-   if keyword_set(deinterlace) then begin
-      ac = a[x0:x1, y0:y1:2]
-      n0 = ((y0 + deinterlace) mod 2) ? ceil(y0/2) : floor(y0/2)
-      n1 = n0 + n_elements(ac[0, *]) - 1
-      dev = dev[x0:x1, n0:n1]
-   endif else begin
-      ac = a[x0:x1, y0:y1]
-      dev = dev[x0:x1, y0:y1]
-   endelse
+     ;;; cropped and deinterlaced iamge
+     aa = aa[0:range]
+     if keyword_set(deinterlace) then begin
+        ac = a[x0:x1, y0:y1:2]
+        n0 = ((y0 + deinterlace) mod 2) ? ceil(y0/2) : floor(y0/2)
+        n1 = n0 + n_elements(ac[0, *]) - 1
+        dev = dev[x0:x1, n0:n1]
+     endif else begin
+        ac = a[x0:x1, y0:y1]
+        dev = dev[x0:x1, y0:y1]
+     endelse
+     
+     ;;; significance estimate within ROI
+     err = abs(dev)/noise > 1.
 
-   ;;; significance estimate within ROI
-   err = abs(dev)/noise > 1.
+     ;; Use radial profile to estimate axial position, zp,
+     ;; David Ruffner's method based on spherical wave model.
+     if dozp then begin
+        rho = findgen(range) + 0.5
+        lap = deriv(aa)         ; Laplacian of azimuthal profile
+        lap = deriv(lap) + lap/rho
+        w = where(((abs(aa-1.) gt noise) and (abs(lap) gt noise))) ;; note: && does not work with arrays
+        qsq = -lap[w]/(aa[w] - 1.) 
+        zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
+        w = where(zsq gt 0., ngood)
+        if ngood lt 2 then begin
+           message, 'could not estimate zp -- skipping this feature', /inf
+           continue
+        endif
+        sigmatrim, zsq[w], mzsq
+        thiszp = sqrt(mzsq)     ; estimated axial position [pixel]
+     endif else $
+        thiszp = zp[ndx]
 
-   ;; Use radial profile to estimate axial position, zp,
-   ;; David Ruffner's method based on spherical wave model.
-   if dozp then begin
-      if doap then begin
-         rho = findgen(range) + 0.5
-         lap = deriv(aa)        ; Laplacian of azimuthal profile
-         lap = deriv(lap) + lap/rho
-         w = where(abs(aa-1.) gt 1e-2)
-         qsq = -lap[w]/(aa[w] - 1.)
-         zsq = rho[w]^2 * ((k*mpp)^2/qsq - 1.)
-         w = where(zsq gt 0., ngood)
-         if ngood lt 2 then begin
-            message, 'could not estimate zp -- skipping this feature', /inf
-            continue
-         endif
-         sigmatrim, zsq[w], mzsq
-         zp = sqrt(mzsq)        ; estimated axial position [pixel]
-      endif else $
-         zp = ap*(4.*k)/median(j0n/rn[where(ismin)])
-   endif
+     ;; Model observed interference pattern as Poisson's spot to
+     ;; obtain radius, ap, from axial position, zp
+     if doap then $
+        ap = thiszp/(4.*k)*median(j0n/rn[where(ismin)])
 
-   ;; Model observed interference pattern as Poisson's spot to
-   ;; obtain radius, ap, from axial position, zp
-   if doap then $
-      ap = zp/(4.*k)*median(j0n/rn[where(ismin)])
+     ;; Estimate np: FIXME: currently uses input value: np0
 
-   ;; Estimate np: FIXME: currently uses input value: np0
+     ;; Estimate alpha and delta
+     alpha = 1.d
+     delta = 0.d
+     
+     ;; Starting Estimates
+     p0 = [thiszp, ap, real_part(np0), imaginary(np0), $
+           real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
+     
+     if ~quiet then lmf_report, 'starting estimates:', [rc, p0]
+     
+     ;; Improve estimates by fitting to radial profile
+     p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
+                        fixap = fixap, fixnp = fixnp, $
+                        fixalpha = fixalpha, fixdelta = fixdelta, $
+                        chisq = thischisq, /quiet)
+     if ~finite(thischisq) then begin
+        message, 'parameter estimate failed -- trying again with fixed delta', /inf, $
+                 noprint = quiet
+        p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
+                           fixap = fixap, fixnp = fixnp, /fixdelta, $
+                           chisq = thischisq, /quiet)
+     endif else begin
+        ;; Some fits fail with alpha = 2.0; have to fixdelta.
+        peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
+        if peggedalpha then begin
+           message, 'alpha exceeds bounds -- trying again with fixed delta', /inf, $
+                    noprint = quiet
+           p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
+                              fixap = fixap, fixnp = fixnp, /fixdelta, $
+                              chisq = thischisq, /quiet)
+        endif
+     endelse
+     if ~finite(thischisq) then begin
+        message, 'parameter estimate failed -- skipping this feature', /inf
+        if dographics then proi.delete
+        continue
+     endif
+     if max(abs(p1[0, 0:2] - p0[0:2])/p0[0:2]) gt 0.5 then begin
+        message, '1D estimate performed badly -- reverting to initial estimates', /inf, $
+                 noprint = quiet
+        p1[0, *] = p0
+     endif
 
-   ;; Estimate alpha and delta
-   alpha = 1.d
-   delta = 0.d
+     if ~quiet then lmf_report, 'improved estimates: ' + string(thischisq), $
+                                [rc, reform(p1[0, *])]
+     
+     ;; 2D fit to refine estimates
+     p2 = [rc-r0, reform(p1[0, *])] ; initial parameters from 1D fit
 
-   ;; Starting Estimates
-   p0 = [zp, ap, real_part(np0), imaginary(np0), $
-         real_part(nm0), imaginary(nm0), alpha, delta] ; initial estimates
+     thisfixdelta = fixdelta or peggedalpha
+     thisdeinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0
+     thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
+                               errors = err, $
+                               chisq = thischisq, $
+                               residuals = residuals, $
+                               fixap = fixap, $
+                               fixnp = fixnp, $
+                               fixalpha = fixalpha, $
+                               fixdelta = thisfixdelta, $
+                               deinterlace = thisdeinterlace, $
+                               resolution = resolution, $
+                               gpu = gpu, $
+                               quiet = quiet)
+     
+     ;;; Handle failure
+     ;; 1. Fit did not converge
+     if n_elements(thisfeature) eq 1 then begin ; fit failed
+        message, 'fit failed -- skipping this feature', /inf
+        if dographics then proi.delete
+        continue
+     endif
+     
+     thisfeature[0, 0:1] += r0  ; center in original image
+     ;; 2. Center shifted by more than half a pixel in plane
+     ;;    or large discrepancy in estimated size.
+     ;;    Accept new center and refit -- only do this once
+     ;if (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
+     ;   if dorefit++ lt maxrefits then begin
+     ;      rc = reform(thisfeature[0, 0:1])
+     ;      message, 'large displacement -- refitting', /inf
+     ;      if dographics then begin
+     ;         rp[0:1, ndx] = rc
+     ;         graphics.pf -> putdata, rp[0, *], rp[1, *]
+     ;         proi.delete
+     ;      endif
+     ;      goto, refit
+     ;   endif
+     ;endif
 
-   if ~quiet then lmf_report, 'starting estimates:', [rc, p0]
-
-   ;; Improve estimates by fitting to radial profile
-   p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
-                      fixap = fixap, fixnp = fixnp, $
-                      fixalpha = fixalpha, fixdelta = fixdelta, $
-                      chisq = thischisq, /quiet)
-   if ~finite(thischisq) then begin
-      message, 'parameter estimate failed -- trying again with fixed delta', /inf, $
-               noprint = quiet
-      p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
-                         fixap = fixap, fixnp = fixnp, /fixdelta, $
-                         chisq = thischisq, /quiet)
-   endif else begin
-      ;; Some fits fail with alpha = 2.0; have to fixdelta.
-      peggedalpha = (p1[0, 6] ge 1.9) && ~fixdelta
-      if peggedalpha then begin
-         message, 'alpha exceeds bounds -- trying again with fixed delta', /inf, $
-                  noprint = quiet
-         p1 = fitlmsphere1d(aa, p0, lambda, mpp, $
-                            fixap = fixap, fixnp = fixnp, /fixdelta, $
-                            chisq = thischisq, /quiet)
-      endif
-   endelse
-   if ~finite(thischisq) then begin
-      message, 'parameter estimate failed -- skipping this feature', /inf
-      if dographics then proi.delete
-      continue
-   endif
-   if max(abs(p1[0, 0:2] - p0[0:2])/p0[0:2]) gt 0.5 then begin
-      message, '1D estimate performed badly -- reverting to initial estimates', /inf, $
-               noprint = quiet
-      p1[0, *] = p0
-   endif
-
-   if ~quiet then lmf_report, 'improved estimates: ' + string(thischisq), $
-                              [rc, reform(p1[0, *])]
-
-   ;; 2D fit to refine estimates
-   p2 = [rc-r0, reform(p1[0, *])]  ; initial parameters from 1D fit
-
-   thisfixdelta = fixdelta or peggedalpha
-   thisdeinterlace = keyword_set(deinterlace) ? deinterlace + r0[1] : 0
-   thisfeature = fitlmsphere(ac, p2, lambda, mpp, $
-                             errors = err, $
-                             chisq = thischisq, $
-                             residuals = residuals, $
-                             fixap = fixap, $
-                             fixnp = fixnp, $
-                             fixalpha = fixalpha, $
-                             fixdelta = thisfixdelta, $
-                             deinterlace = thisdeinterlace, $
-                             resolution = resolution, $
-                             gpu = gpu, $
-                             quiet = quiet)
-
-   ;;; Handle failure
-   ;; 1. Fit did not converge
-   if n_elements(thisfeature) eq 1 then begin ; fit failed
-      message, 'fit failed -- skipping this feature', /inf
-      if dographics then proi.delete
-      continue
-   endif
-
-   thisfeature[0, 0:1] += r0    ; center in original image
-   ;; 2. Center shifted by more than half a pixel in plane
-   ;;    or large discrepancy in estimated size.
-   ;;    Accept new center and refit -- only do this once
-   ;if (abs(ap - thisfeature[0, 3])/ap gt 0.5) then begin
-   ;   if dorefit++ lt maxrefits then begin
-   ;      rc = reform(thisfeature[0, 0:1])
-   ;      message, 'large displacement -- refitting', /inf
-   ;      if dographics then begin
-   ;         rp[0:1, ndx] = rc
-   ;         graphics.pf -> putdata, rp[0, *], rp[1, *]
-   ;         proi.delete
-   ;      endif
-   ;      goto, refit
-   ;   endif
-   ;endif
-
-   if doreport then lmf_report, 'chisq: ' + string(thischisq), thisfeature[0, *]
-
-   if dographics then begin
-      proi.delete
-      rp[0:1, ndx] = thisfeature[0,0:1]
-      graphics.pf -> putdata, rp[0,*], rp[1,*]
-   endif
-
-   thisfeature = [[thisfeature], [thischisq, range]]
-   features.add, thisfeature
-   count++
-endfor
-
-return, features.toarray()
+     if doreport then lmf_report, 'chisq: ' + string(thischisq), thisfeature[0, *]
+     
+     if dographics then begin
+        proi.delete
+        rp[0:1, ndx] = thisfeature[0,0:1]
+        graphics.pf -> putdata, rp[0,*], rp[1,*]
+     endif
+     
+     thisfeature = [[thisfeature], [thischisq, range]]
+     features.add, thisfeature
+     count++
+  endfor
+  
+  return, features.toarray()
 end

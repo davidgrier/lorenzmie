@@ -236,12 +236,18 @@ nsets = isa(nsets, /number, /scalar) ? long(nsets) : 10000L
 
 noprint = keyword_set(quiet)
 message, 'Computing profiles ...', /inf, noprint = noprint
-if ~noprint then tic
 profiles = fltarr(self.rad+1, nsets, /nozero)
-for i = 0, nsets-1 do $
-   profiles[*, i] = lmsphereprofile(findgen(self.rad+1) + 0.5, zp[i], ap[i], np[i], $
-                                    self.nm, 1., 0.,  self.lambda, self.mpp)
+dhm = dhmLorenzMieprofile(radius = self.rad+1, lambda = self.lambda, $
+                          mpp = self.mpp, nm = self.nm)
+if ~noprint then tic
+for i = 0, nsets-1 do begin
+   dhm.setproperty, zp = zp[i], ap = ap[i], np = np[i]
+   profiles[*, i] = dhm.hologram
+endfor
+;   profiles[*, i] = lmsphereprofile(findgen(self.rad+1) + 0.5, zp[i], ap[i], np[i], $
+;                                    self.nm, 1., 0.,  self.lambda, self.mpp)
 if ~noprint then toc
+obj_destroy, dhm
 
 self.data['zp'] = (zp - self.zrange[0])/(self.zrange[1] - self.zrange[0])
 self.data['ap'] = (ap - self.arange[0])/(self.arange[1] - self.arange[0])

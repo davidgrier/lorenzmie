@@ -6,7 +6,6 @@
 ;    This object uses Lorenz-Mie theory to compute the 
 ;    hologram of a sphere as would be recorded with 
 ;    in-line digital video microscopy.
-;    The Lorenz-Mie calculation is accelerated using GPULib.
 ;
 ; CATEGORY:
 ;    Holographic video microscopy, object graphics
@@ -16,12 +15,16 @@
 ;
 ; PROPERTIES:
 ;    NOTE: R = Required for initialization
+;          I = Optionally used for initialization
 ;          G = Get
 ;          S = Set
 ;
 ;    [RG ] DIM:    [nx, ny] dimensions of hologram [pixels].
+;    [IG ] R0:     coordinates of lower-left pixel [pixels]
+;                  Default: [0,0]
 ;    [RGS] LAMBDA: vacuum wavelength of light [um]
 ;    [RGS] MPP:    magnification [um/pixel]
+
 ;    
 ;    [ GS] RP: [xp, yp, zp] position of the center of the sphere 
 ;                  relative to the center of the image in the focal
@@ -36,7 +39,6 @@
 ;    [ GS] DELTA: wavefront distortion [pixel]
 ; 
 ;    [ G ] HOLOGRAM: real-valued computed holographic image
-;    [ G ] FIELD:    complex-valued scattered field
 ;    [ GS] AB:       Generalized Lorenz-Mie scattering coefficients
 ;    [ GS] RESOLUTION: Resolution of Lorenz-Mie coefficients.
 ;                      0: Full resolution
@@ -47,8 +49,6 @@
 ;        Compute either the even (DEINTERLACE = 2) or
 ;        odd (DEINTERLACE = 1) field of an interlaced hologram.
 ;        Default: Return the full hologram.
-;    NOZ: (Initialization)
-;        Eliminate z-component of scattered field from intensity calculation.
 ;
 ; METHODS:
 ;    GetProperty: Get accessible properties
@@ -77,16 +77,10 @@
 ;    video holographic microscopy," Opt. Express 15, 18275-18282
 ;    (2007).
 ;
-; 5. GPULIB: http://www.txcorp.com/products/GPULib/
-;
-; 6. F. C. Cheong, B. Sun, R. Dreyfus, J. Amato-Grill, K. Xiao,
+; 5. F. C. Cheong, B. Sun, R. Dreyfus, J. Amato-Grill, K. Xiao,
 ;    L. Dixon and D. G. Grier,
 ;    "Flow visualization and flow cytometry with holographic video
 ;    microscopy," Opt. Express 17, 13071-13079 (2009).
-;
-; 7. P. Messmer, P. J. Mullowney and B. E. Granger,
-;    "GPULib: GPU computing in high-level languages,"
-;    Computer Science and Engineering 10, 70-73 (2008).
 ;
 ; MODIFICATION HISTORY:
 ; Written by David G. Grier, New York University 09/05/2011.
@@ -124,168 +118,54 @@
 ; 07/25/2013 DGG CPU code returns correct fields.
 ; 02/21/2015 DGG use V pointer property as hook for subclasses
 ;    to provide alternative geommetries.
+; 03/08/2015 DGG remove GPU code.  The idea is to implement
+;    all acceleration modes by subclassing the base class.
+; 06/01/2016 DGG allow ap and np to be arrays for stratified spheres.
+; 11/10/2016 Mark Hannel and David B. Ruffner Account for particles
+;    below the focal plane.
 ;
 ; NOTES:
-; Use low-level GPU routines for speed.
-; Permit ap and np to be arrays for core-shell particles
 ; Integrate sphere_coefficient code?
-; Optionally force single precision?
 ; Allow for indexing points -- calculate only at specified points
+; Use masking to handle deinterlacing.
 ; 
-; Copyright (c) 2011-2015 David G. Grier
+; Copyright (c) 2011-2016 Mark Hannel, David B. Ruffner and David G. Grier
 ;-    
 
 ;;;;
 ;
-; DGGdhmLMSphere::ComputeGeometryCPU
+; DGGdhmLMSphere::UpdateGeometry
 ;
 ; Update geometric factors on CPU
 ;
-pro DGGdhmLMSphere::ComputeGeometryCPU
+pro DGGdhmLMSphere::UpdateGeometry
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-xc = self.rp[0]
-yc = self.rp[1]
-
-nx = self.nx
-ny = self.ny
-npts = nx * ny
-stride = (self.deinterlace ne 0) ? 2.d : 1.d
-
-v = self.geometry
-
-(*v).x = rebin(dindgen(nx) - xc, nx, ny, /sample)
-(*v).x = reform((*v).x, npts, /overwrite)
-(*v).y = rebin(stride*dindgen(1, ny) + ((self.deinterlace mod 2) - yc), nx, ny, /sample)
-(*v).y = reform((*v).y, npts, /overwrite)
-z = self.rp[2] > 1.d
-
+  v = self.geometry
+  coordinates = self.coordinates
+  
+  (*v).x = (*coordinates).x - self.rp[0]
+  (*v).y = (*coordinates).y - self.rp[1]
+  
+;  z = self.rp[2] > 1.d ;;; WHY? DGG 11/10/16
+  z = self.rp[2]
+  
 ; convert to spherical coordinates centered on the sphere.
 ; (r, theta, phi) is the spherical coordinate of the pixel
 ; at (x,y) in the imaging plane at distance z from the
 ; center of the sphere.
-(*v).rho   = sqrt((*v).x^2 + (*v).y^2)
-(*v).kr    = sqrt((*v).rho^2 + z^2)
-(*v).costheta = z/(*v).kr
-(*v).sintheta = (*v).rho/(*v).kr
-phi   = atan((*v).y, (*v).x)
-(*v).cosphi = cos(phi)
-(*v).sinphi = sin(phi)
+  (*v).rho   = sqrt((*v).x^2 + (*v).y^2)
+  (*v).kr    = sqrt((*v).rho^2 + z^2) > 1.d-6
+  (*v).costheta = z/(*v).kr
+  (*v).sintheta = (*v).rho/(*v).kr
+  phi   = atan((*v).y, (*v).x)
+  (*v).cosphi = cos(phi)
+  (*v).sinphi = sin(phi)
 
-(*v).kr *= self.k                       ; reduced radial coordinate
-(*v).sinkr = sin((*v).kr)
-(*v).coskr = cos((*v).kr)
-
-end
-
-;;;;
-;
-; DGGdhmLMSphere::ComputeCPU
-;
-; Compute hologram on CPU
-;
-pro DGGdhmLMSphere::ComputeCPU
-
-COMPILE_OPT IDL2, HIDDEN
-
-; turn off math exceptions for floating point underflow errors
-;currentexcept = !except
-;!except = 0
-;void = check_math()
-
-ci = dcomplex(0, 1)             ; imaginary unit
-
-ab = *self.ab                   ; Lorenz-Mie coefficients
-nc = n_elements(ab[0,*]) - 1    ; number of terms
-
-self->computeGeometryCPU
-
-npts = self.nx * self.ny        ; number of points in hologram
-v = self.v                      ; preallocated variables
-
-; starting points for recursive function evaluation ...
-; ... Riccati-Bessel radial functions, page 478
-xi_nm2 = dcomplex((*v).coskr, (*v).sinkr) ; \xi_{-1}(kr)
-xi_nm1 = dcomplex((*v).sinkr,-(*v).coskr) ; \xi_0(kr)
-
-; ... angular functions (4.47), page 95
-pi_nm1 = 0.d                    ; \pi_0(\cos\theta)
-pi_n   = 1.d                    ; \pi_1(\cos\theta)
-
-Mo1n = dcomplexarr(npts, 3, /NOZERO)
-Mo1n[*, 0] = dcomplex(0)
-Ne1n = dcomplexarr(npts, 3, /NOZERO)
-Es = dcomplexarr(npts, 3)
-
-; Compute field by summing multipole contributions
-for n = 1.d, nc do begin
-
-; upward recurrences ...
-; ... Legendre factor (4.47)
-; Method described by Wiscombe (1980)
-    swisc = pi_n * (*v).costheta
-    twisc = swisc - pi_nm1
-    tau_n = pi_nm1 - n * twisc  ; -\tau_n(\cos\theta)
-
-; ... Riccati-Bessel function, page 478
-    xi_n = (2.d*n - 1.d) * (xi_nm1 / (*v).kr) - xi_nm2    ; \xi_n(kr)
-
-; ... Deirmendjian's derivative
-    dn = (n * xi_n) / (*v).kr - xi_nm1
-
-; vector spherical harmonics (4.50)
-;   Mo1n[*, 0] = dcomplex(0.d)   ; no radial component
-    Mo1n[0, 1] = pi_n * xi_n     ; ... divided by cosphi/kr
-    Mo1n[0, 2] = tau_n * xi_n    ; ... divided by sinphi/kr
-
-    Ne1n[0, 0] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
-    Ne1n[0, 1] = tau_n * dn      ; ... divided by cosphi/kr
-    Ne1n[0, 2] = pi_n  * dn      ; ... divided by sinphi/kr
-
-; prefactor, page 93
-    En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
-
-; the scattered field in spherical coordinates (4.45)
-    Es += (En * ci * ab[0, n]) * Ne1n
-    Es -= (En * ab[1, n]) * Mo1n
-
-; upward recurrences ...
-; ... angular functions (4.47)
-; Method described by Wiscombe (1980)
-    pi_nm1 = pi_n
-    pi_n = swisc + ((n + 1.d) / n) * twisc
-
-; ... Riccati-Bessel function
-    xi_nm2 = xi_nm1
-    xi_nm1 = xi_n
-endfor
-
-; geometric factors were divided out of the vector
-; spherical harmonics for accuracy and efficiency ...
-; ... put them back at the end.
-Es[*, 0] *= (*v).cosphi * (*v).sintheta / (*v).kr^2
-Es[*, 1] *= (*v).cosphi / (*v).kr
-Es[*, 2] *= (*v).sinphi / (*v).kr
-
-;;; Hologram
-;;;
-;;; I(\vec{r}) = |\hat{x} + \alpha \exp(-i k zp) \vec{E}_s(\vec{r})|^2
-;;;
-; NOTE: Project \hat{x} onto spherical coordinates
-; \hat{x} = \sin\theta \cos\phi \hat{r} 
-;           + \cos\theta \cos\phi \hat{\theta}
-;           - \sin\phi \hat{\phi}
-;
-Ne1n = (self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))) * Es
-Ne1n[*, 0] += (*v).cosphi * (*v).sintheta
-Ne1n[*, 1] += (*v).cosphi * (*v).costheta
-Ne1n[*, 2] -= (*v).sinphi
-
-*self.hologram = reform(total(real_part(Ne1n * conj(Ne1n)), 2), self.nx, self.ny)
-
-;status = check_math()
-;!except = currentexcept                ; restore math error checking
+  (*v).kr *= self.k             ; reduced radial coordinate
+  (*v).sinkr = sin((*v).kr)
+  (*v).coskr = cos((*v).kr)
 end
 
 ;;;;
@@ -296,219 +176,124 @@ end
 ;
 pro DGGdhmLMSphere::Compute
 
-COMPILE_OPT IDL2, HIDDEN
-
-if ~self.gpu then begin
-   self->ComputeCPU
-   return
-endif
+  COMPILE_OPT IDL2, HIDDEN
 
 ; turn off math exceptions for floating point underflow errors
-currentexcept = !except
-!except = 0
-void = check_math()
+;currentexcept = !except
+;!except = 0
+;void = check_math()
 
-ci = dcomplex(0, 1)             ; imaginary unit
+  ci = dcomplex(0, 1)           ; imaginary unit
 
-ab = *self.ab                   ; Lorenz-Mie coefficients
-nc = n_elements(ab[0,*]) - 1    ; number of terms
+  ab = *self.ab                 ; Lorenz-Mie coefficients
+  nc = n_elements(ab[0,*]) - 1  ; number of terms
+  
+  v = self.geometry             ; preallocated variables
 
-v = *(self.v)                   ; structure of GPU variables
+  ;; starting points for recursive function evaluation ...
+  ;; ... Riccati-Bessel radial functions, page 478
+  ;; Particles above the focal plane create diverging waves
+  ;; described by Eq. (4.13) for $h_n^{(1)}(kr)$.  These have z > 0.
+  ;; Those below the focal plane appear to be converging
+  ;; from the perspective of the camera.  They are described
+  ;; by Eq. (4.14) for $h_n^{(2)}(kr)$, and have z < 0.
+  ;; We can select the appropriate case by applying the correct
+  ;; sign of the imaginary part of the starting functions ...
+  sgn = signum(self.rp[2]) ; particle above (+1) or below (-1) the focal plane
+  xi_nm2 = dcomplex((*v).coskr, sgn*(*v).sinkr) ; \xi_{-1}(kr)
+  xi_nm1 = dcomplex((*v).sinkr,-sgn*(*v).coskr) ; \xi_0(kr)
 
-xc = self.rp[0]
-yc = self.rp[1] - (self.deinterlace mod 2)
+  ;; ... angular functions (4.47), page 95
+  pi_nm1 = 0.d                  ; \pi_0(\cos\theta)
+  pi_n   = 1.d                  ; \pi_1(\cos\theta)
 
-; handle deinterlacing
-nx = self.nx
-ny = self.ny
-stride = (self.deinterlace ne 0) ? 2.d : 1.d
+  Mo1n = dcomplexarr((*v).npts, 3, /NOZERO)
+  Mo1n[*, 0] = dcomplex(0)
+  Ne1n = dcomplexarr((*v).npts, 3, /NOZERO)
+  Es = dcomplexarr((*v).npts, 3)
 
-v.x = gpumake_array(nx, ny, type = self.type, /index)
-v.y = gpucopy(v.x, LHS = v.y)
-v.y = gpufloor(1.d, 1.d/nx, v.y, 0.d, 0.d, LHS = v.y)
-v.x = gpuadd(1.d, v.x, -nx, v.y, -xc, LHS = v.x)
-v.y = gpuadd(stride, v.y, 0.d, v.y, -yc, LHS = v.y)
-v.z = gpuadd(0.d, v.x, 0.d, v.x, self.rp[2], LHS = v.z, /NONBLOCKING)
+  ;; Compute field by summing multipole contributions
+  for n = 1.d, nc do begin
 
-; rho = sqrt(x^2 + y^2)
-v.rho = gpumult(v.x, v.x, LHS = v.rho, /NONBLOCKING)
-v.kr  = gpumult(v.y, v.y, LHS = v.kr)
-v.rho = gpuadd(v.rho, v.kr, LHS = v.rho)
+  ;; upward recurrences ...
+  ;; ... Legendre factor (4.47)
+  ;; Method described by Wiscombe (1980)
+     swisc = pi_n * (*v).costheta
+     twisc = swisc - pi_nm1
+     tau_n = pi_nm1 - n * twisc ; -\tau_n(\cos\theta)
 
-; r = sqrt(rho^2 + z^2)
-v.kr = gpusqrt(1.d, 1.d, v.rho, self.rp[2]^2, 0.d, LHS = v.kr)
-;;; NOTE: Under GPULib 1.4.4, the 5-parameter form of gpusqrt
-; incorrectly yields NAN for some input values on some GPUs, whereas
-; the 1-parameter form works properly.  This seems to be fixed under
-; GPULib 1.6.0.
-; v.kr = gpuadd(1.d, v.rho, 0.d, v.rho, self.rp[2]^2, LHS = v.kr)
-; v.kr = gpusqrt(v.kr, LHS = v.kr, /NONBLOCKING)
-v.rho = gpusqrt(v.rho, LHS = v.rho)
+  ;; ... Riccati-Bessel function, page 478
+     xi_n = (2.d*n - 1.d) * (xi_nm1 / (*v).kr) - xi_nm2 ; \xi_n(kr)
 
-; polar angle
-v.sintheta = gpudiv(v.rho, v.kr, LHS = v.sintheta, /NONBLOCKING)
-v.costheta = gpudiv(v.z,   v.kr, LHS = v.costheta, /NONBLOCKING)
+  ;; ... Deirmendjian's derivative
+     dn = (n * xi_n) / (*v).kr - xi_nm1
 
-; azimuthal angle
-;;; correct divide-by-zero errors when rho is small
-if ((abs(xc) + abs(yc)) mod 1.) lt 1e-3 then begin ; center falls on pixel center
-   ;; don't do anything if the center is outside the array
-   if (xc ge 0 and xc lt nx and yc ge 0 and yc lt ny) then begin
-      rho = gpugetarr(v.rho)
-      rho[xc, yc] = 1.
-      gpuputarr, rho, v.rho
-;      (v.rho)[xc, yc] = 1.
-      x = gpugetarr(v.x)
-      x[xc, yc] = 1.
-      gpuputarr, x, v.x
-;      (v.x)[xc, yc] = 1.
-   endif
-endif
-v.sinphi = gpudiv(v.y, v.rho, LHS = v.sinphi, /NONBLOCKING)
-v.cosphi = gpudiv(v.x, v.rho, LHS = v.cosphi, /NONBLOCKING)
+  ;; vector spherical harmonics (4.50)
+  ;;   Mo1n[*, 0] = dcomplex(0.d)   ; no radial component
+     Mo1n[0, 1] = pi_n * xi_n   ; ... divided by cosphi/kr
+     Mo1n[0, 2] = tau_n * xi_n  ; ... divided by sinphi/kr
 
-; scale distances by wavenumber
-v.kr = gpuadd(self.k, v.kr, 0.d, v.kr, 0.d, LHS = v.kr)
+     Ne1n[0, 0] = n*(n + 1.d) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
+     Ne1n[0, 1] = tau_n * dn                ; ... divided by cosphi/kr
+     Ne1n[0, 2] = pi_n  * dn                ; ... divided by sinphi/kr
 
-; starting points for recursive function evaluation ...
-; ... Riccati-Bessel radial functions, page 478
-; \xi_{0}(kr)  = sin(kr) - i cos(kr)
-; \xi_{-1}(kr) = cos(kr) + i sin(kr)
-v.x = gpucos(v.kr, LHS = v.x, /NONBLOCKING)
-v.y = gpusin(v.kr, LHS = v.y)
-v.xi[1] = gpuadd(1.d, v.y, -ci, v.x, 0.d, LHS = v.xi[1], /NONBLOCKING)
-v.xi[2] = gpuadd(1.d, v.x,  ci, v.y, 0.d, LHS = v.xi[2], /NONBLOCKING)
+  ;; prefactor, page 93
+     En = ci^n * (2.d*n + 1.d) / n / (n + 1.d)
 
-; ... angular functions (4.47), page 95
-; \pi_0(\cos\theta) = 0
-; \pi_1(\cos\theta) = 1
-v.pi[1] = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.pi[1], /NONBLOCKING)
-v.pi[0] = gpuadd(0.d, v.z, 0.d, v.z, 1.d, LHS = v.pi[0], /NONBLOCKING)
+  ;; the scattered field in spherical coordinates (4.45)
+     Es += (En * ci * ab[0, n]) * Ne1n
+     Es -= (En * ab[1, n]) * Mo1n
 
-; ... scattered field
-v.Es1 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es1, /NONBLOCKING)
-v.Es2 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es2, /NONBLOCKING)
-v.Es3 = gpuadd(0.d, v.z, 0.d, v.z, 0.d, LHS = v.Es3, /NONBLOCKING)
+  ;; upward recurrences ...
+  ;; ... angular functions (4.47)
+  ;; Method described by Wiscombe (1980)
+     pi_nm1 = pi_n
+     pi_n = swisc + ((n + 1.d) / n) * twisc
 
-; Compute field by summing multipole contributions
-for n = 1.d, nc do begin
+  ;; ... Riccati-Bessel function
+     xi_nm2 = xi_nm1
+     xi_nm1 = xi_n
+  endfor
 
-; Field calculation prefactor, page 93
-   En = ci^n * (2.d * n + 1.d) / n / (n + 1.d)
-   an = En * ci * ab[0, n]
-   bn = -En * ab[1, n]
+  ;; geometric factors were divided out of the vector
+  ;; spherical harmonics for accuracy and efficiency ...
+  ;; ... put them back at the end.
+  Es[*, 0] *= (*v).cosphi * (*v).sintheta / (*v).kr^2
+  Es[*, 1] *= (*v).cosphi / (*v).kr
+  Es[*, 2] *= (*v).sinphi / (*v).kr
 
-; upward recurrences ...
+  ;; angular demagnification
+  ;; Abbe sine condition
+  ;; sinthetap = noil * sintheta/M
+  ;; costhetap = sqrt(1 - sinthetap^2)
+  
+  ;; solid angle projection
+  ;; fac = sqrt(costhetap/costheta)
+  ;; Es[*, 1] *= fac
+  ;; Es[*, 2] *= fac
 
-; ... Legendre factor (4.47)
-; Method described by Wiscombe (1980)
-;  swisc = \pi_n * \cos\theta
-;  twisc = swisc - \pi_{n-1}
-;  tau = n * twisc - \pi_{n-1}
-   v.x = gpumult(v.pi[0], v.costheta, LHS = v.x, /NONBLOCKING) ;   swisc in x
+  ;; k-vector rotation
+  ;; costheta = costhetap
+  ;; sintheta = sinthetap
+  
+  ;;; Hologram
+  ;;;
+  ;;; I(\vec{r}) = |\hat{x} + \alpha \exp(-i k zp) \vec{E}_s(\vec{r})|^2
+  ;;;
+  ;; NOTE: Project \hat{x} onto spherical coordinates
+  ;; \hat{x} = \sin\theta \cos\phi \hat{r} 
+  ;;           + \cos\theta \cos\phi \hat{\theta}
+  ;;           - \sin\phi \hat{\phi}
+  ;;
+  Ne1n = (self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))) * Es
+  Ne1n[*, 0] += (*v).cosphi * (*v).sintheta
+  Ne1n[*, 1] += (*v).cosphi * (*v).costheta
+  Ne1n[*, 2] -= (*v).sinphi
 
-; ... Riccati-Bessel function, page 478
-; \xi_n = (2n - 1) xi_{n-1} / kr - xi_{n-2}
-   v.xi[0] = gpudiv(v.xi[1], v.kr, LHS = v.xi[0])
-   v.xi[0] = gpuadd(2.d*n - 1.d, v.xi[0], -1.d, v.xi[2], 0.d, $
-                      LHS = v.xi[0], /NONBLOCKING)
+  *self.hologram = reform(total(real_part(Ne1n * conj(Ne1n)), 2), self.nx, self.ny)
 
-   v.y = gpusub(v.x, v.pi[1], LHS = v.y)                             ; twisc in y
-   v.z = gpuadd(1.d, v.pi[1], -n, v.y, 0.d, LHS = v.z, /NONBLOCKING) ; -tau in z
-
-; ... Deirmendjian's derivative
-; d_n = (n xi_n)/kr - xi_{n-1}
-   v.dn = gpudiv(v.xi[0], v.kr, LHS = v.dn)
-   v.dn = gpuadd(n, v.dn, -1.d, v.xi[1], 0.d, LHS = v.dn)
-
-; Vector spherical harmonics (4.50)
-;  Mo1n[0,*] = 0.d            ; no radial component
-;  Mo1n[1,*] = pi_n * xi_n    ; ... divided by cosphi/kr
-;  Mo1n[2,*] = -tau_n * xi_n  ; ... divided by sinphi/kr
-   v.Mo1n2 = gpumult(v.pi[0], v.xi[0], LHS = v.Mo1n2, /NONBLOCKING)
-   v.Mo1n3 = gpumult(v.z, v.xi[0], LHS = v.Mo1n3, /NONBLOCKING)
-
-;  Ne1n[0,*] = n*(n+1) * pi_n * xi_n ; ... divided by cosphi sintheta/kr^2
-;  Ne1n[1,*] = -tau_n * dn    ; ... divided by cosphi/kr
-;  Ne1n[2,*] = pi_n * dn      ; ... divided by sinphi/kr
-   v.Ne1n1 = gpumult(n*(n+1.d), v.pi[0], 1.d, v.xi[0], 0.d, $
-                       LHS = v.Ne1n1, /NONBLOCKING)
-   v.Ne1n2 = gpumult(v.z, v.dn, LHS = v.Ne1n2, /NONBLOCKING)
-   v.Ne1n3 = gpumult(v.pi[0], v.dn, LHS = v.Ne1n3)
-   
-; scattered field in spherical coordinates (4.45)
-   v.Es1 = gpuadd(1.d, v.Es1, an, v.Ne1n1, 0.d, $
-                    LHS = v.Es1, /NONBLOCKING)
-   v.Es2 = gpuadd(1.d, v.Es2, an, v.Ne1n2, 0.d, $
-                    LHS = v.Es2, /NONBLOCKING)
-   v.Es3 = gpuadd(1.d, v.Es3, an, v.Ne1n3, 0.d, LHS = v.Es3)
-   v.Es2 = gpuadd(1.d, v.Es2, bn, v.Mo1n2, 0.d, $
-                    LHS = v.Es2, /NONBLOCKING)
-   v.Es3 = gpuadd(1.d, v.Es3, bn, v.Mo1n3, 0.d, $
-                    LHS = v.Es3, /NONBLOCKING)
-
-; upward recurrences ...
-; ... Riccati-Bessel function
-;  xi_{n-2} = xi_{n-1}
-;  xi_{n-1} = xi_n
-   v.xi = shift(v.xi, 1)
-
-; ... angular functions (4.47)
-; Method described by Wiscombe (1980)
-;  pi_{n-1} = pi_n
-;  pi_n = swisc + (n + 1) twisc / n
-   v.pi = shift(v.pi, 1)
-   v.pi[0] = gpuadd(1.d, v.x, (n + 1.d)/n, v.y, 0.d, LHS = v.pi[0], /NONBLOCKING)
-
-endfor
-
-;;; Scattered field 
-;;;
-;;; \vec{E}_s(\vec{r}) in spherical coordinates
-;;;
-; Geometric factors were divided out of the vector spherical harmonics
-; for accuracy and efficiency.  Put them back in now:
-v.x = gpudiv(v.cosphi, v.kr, LHS = v.x, /NONBLOCKING)
-v.y = gpudiv(v.sintheta, v.kr, LHS = v.y, /NONBLOCKING)
-v.z = gpudiv(v.sinphi, v.kr, LHS = v.z)
-v.Es1 = gpumult(v.Es1, v.x, LHS = v.Es1)
-v.Es1 = gpumult(v.Es1, v.y, LHS = v.Es1, /NONBLOCKING)
-v.Es2 = gpumult(v.Es2, v.x, LHS = v.Es2, /NONBLOCKING)
-v.Es3 = gpumult(v.Es3, v.z, LHS = v.Es3)
-
-;;; Hologram
-;;;
-;;; I(\vec{r}) = |\hat{x} + \alpha \exp(-i k zp) \vec{E}_s(\vec{r})|^2
-;;;
-; NOTE: Project \hat{x} onto spherical coordinates
-; \hat{x} = \sin\theta \cos\phi \hat{r} 
-;           + \cos\theta \cos\phi \hat{\theta}
-;           - \sin\phi \hat{\phi}
-;
-fac = self.alpha * exp(dcomplex(0, -self.k*(self.rp[2] + self.delta)))
-v.x = gpumult(v.sintheta, v.cosphi, LHS = v.x, /NONBLOCKING)
-v.y = gpumult(v.costheta, v.cosphi, LHS = v.y, /NONBLOCKING)
-v.xi[2] = gpuadd(-1., v.sinphi, fac, v.Es3, 0., LHS = v.xi[2])
-v.xi[1] = gpuadd(1., v.y, fac, v.Es2, 0., LHS = v.xi[1], /NONBLOCKING)
-v.xi[0] = gpuadd(1., v.x, fac, v.Es1, 0., LHS = v.xi[0])
-;
-; Intensity is squared magnitude
-;
-v.x = gpuconj(v.xi[0], LHS = v.x, /NONBLOCKING)
-v.y = gpuconj(v.xi[1], LHS = v.y, /NONBLOCKING)
-v.z = gpuconj(v.xi[2], LHS = v.z)
-v.xi[0] = gpumult(v.xi[0], v.x, LHS = v.xi[0], /NONBLOCKING)
-v.xi[1] = gpumult(v.xi[1], v.y, LHS = v.xi[1], /NONBLOCKING)
-v.xi[2] = gpumult(v.xi[2], v.z, LHS = v.xi[2])
-v.dn = gpuadd(v.xi[0], v.xi[1], LHS = v.dn)
-v.dn = gpuadd(v.dn, v.xi[2], LHS = v.dn)
-
-v.hologram = gpureal(v.dn, LHS = v.hologram)
-
-*self.hologram = gpugetarr(v.hologram, LHS = *self.hologram)
-
-status = check_math()
-!except = currentexcept                ; restore math error checking
+;status = check_math()
+;!except = currentexcept                ; restore math error checking
 end
 
 ;;;;
@@ -521,8 +306,8 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
                                  yp = yp, $
                                  zp = zp, $
                                  rp = rp, $
-                                 ap = ap, $
-                                 np = np, $
+                                 ap = ap_, $
+                                 np = np_, $
                                  kp = kp, $
                                  nm = nm, $
                                  km = km, $
@@ -532,100 +317,103 @@ pro DGGdhmLMSphere::SetProperty, xp = xp, $
                                  lambda = lambda, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
-                                 type = type, $
                                  dim = dim
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-if arg_present(deinterlace) then begin
-   message, "The DEINTERLACE flag can only be set at initialization", /inf
-   return
-endif
+  if arg_present(deinterlace) then begin
+     message, "The DEINTERLACE flag can only be set at initialization", /inf
+     return
+  endif
 
-if arg_present(type) then begin
-   message, "The TYPE keyword can only be set at initialization", /inf
-   return
-endif
+  if arg_present(dim) then begin
+     message, "The DIMENSION keyword can only be set at initialization", /inf
+     return
+  endif
 
-if arg_present(dim) then begin
-   message, "The DIMENSION keyword can only be set at initialization", /inf
-   return
-endif
+  newcoeffs = 0B              ; flag to determine if new Lorenz-Mie coefficients are required
 
-newcoeffs = 0B ; flag to determine if new Lorenz-Mie coefficients are required
+  ;;; Geometry
+  if (doupdate = isa(xp, /scalar, /number)) then $
+     self.rp[0] = double(xp)
+  if (doupdate or= isa(yp, /scalar, /number)) then $
+     self.rp[1] = double(yp)
+  if (doupdate or= isa(zp, /scalar, /number)) then $
+     self.rp[2] = double(zp)
+  if (doupdate or= (isa(rp, /number, /array))) then $
+     if n_elements(rp) eq 3 then $
+        self.rp = double(rp)
+  if doupdate then $
+     self.UpdateGeometry
 
-;;; Geometry
-if isa(xp, /scalar, /number) then self.rp[0] = double(xp)
-if isa(yp, /scalar, /number) then self.rp[1] = double(yp)
-if isa(zp, /scalar, /number) then self.rp[2] = double(zp)
-if (n_elements(rp) eq 3) then self.rp = double(rp)
+  if isa(mpp, /scalar, /number) then $
+     self.mpp = double(mpp)
 
-if isa(mpp, /scalar, /number) then $
-   self.mpp = double(mpp)
+  ;;; Illumination
+  if isa(alpha, /scalar, /number) then $
+     self.alpha = double(alpha)
 
-;;; Illumination
-if isa(alpha, /scalar, /number) then $
-   self.alpha = double(alpha)
+  if isa(delta, /scalar, /number) then $
+     self.delta = double(delta)
 
-if isa(delta, /scalar, /number) then $
-   self.delta = double(delta)
+  ;;; Properties of particle and medium
+  if isa(ab, /number, /array) then begin
+     sz = size(ab)
+     if (sz[0] ne 2) or (sz[1] ne 2)  then begin
+        message, 'AB: scattering coefficients must be a [2,n] array', /inf
+        return
+     endif
+     self.ab = ptr_new(dcomplex(ab))
+  endif
 
-;;; Properties of particle and medium
-if isa(ab, /number, /array) then begin
-   sz = size(ab)
-   if (sz[0] ne 2) or (sz[1] ne 2)  then begin
-      message, 'AB: scattering coefficients must be a [2,n] array', /inf
-      return
-   endif
-   self.ab = ptr_new(dcomplex(ab))
-endif
+  if isa(ap_, /number) then begin
+     ap = double(ap_)
+     self.ap = ptr_new(ap, /no_copy)
+     newcoeffs = 1B
+  endif
 
-if isa(ap, /scalar, /number) then begin
-   self.ap = double(ap)
-   newcoeffs = 1B
-endif
+  if isa(np_, /number) then begin
+     np = dcomplex(np_)
+     self.np = ptr_new(np, /no_copy)
+     newcoeffs = 1B
+  endif
 
-if isa(np, /scalar, /number) then begin
-   self.np = dcomplex(np)
-   newcoeffs = 1B
-endif
+  if isa(kp, /scalar, /number) then begin
+     np = dcomplex(real_part(*self.np), kp)
+     self.np = ptr_new(np, /no_copy)
+     newcoeffs = 1B
+  endif
 
-if isa(kp, /scalar, /number) then begin
-   self.np = dcomplex(real_part(self.np), kp)
-   newcoeffs = 1B
-endif
+  if isa(nm, /scalar, /number) then begin
+     self.nm = dcomplex(nm)
+     newcoeffs = 1B
+  endif
 
-if isa(nm, /scalar, /number) then begin
-   self.nm = dcomplex(nm)
-   newcoeffs = 1B
-endif
+  if isa(km, /scalar, /number) then begin
+     self.nm = dcomplex(real_part(self.nm), km)
+     newcoeffs = 1B
+  endif
 
-if isa(km, /scalar, /number) then begin
-   self.nm = dcomplex(real_part(self.nm), km)
-   newcoeffs = 1B
-endif
+  if isa(resolution, /scalar, /number) then begin
+     self.resolution = double(resolution)
+     newcoeffs = 1B
+  endif
 
-if isa(resolution, /scalar, /number) then begin
-   self.resolution = double(resolution)
-   newcoeffs = 1B
-endif
+  if isa(lambda, /scalar, /number) then begin
+     self.lambda = double(lambda)
+     newcoeffs = 1B
+  endif
 
-if isa(lambda, /scalar, /number) then begin
-   self.lambda = double(lambda)
-   newcoeffs = 1B
-endif
+  self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
 
-self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
+  ;;; compute new Lorenz-Mie coefficients, if necessary
+  if (newcoeffs) then begin
+     ab = sphere_coefficients(*self.ap, *self.np, self.nm, self.lambda, resolution = self.resolution)
+     self.ab = ptr_new(ab, /no_copy)
+  endif
 
-;;; compute new Lorenz-Mie coefficients, if necessary
-if (newcoeffs) then begin
-   ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, resolution = self.resolution)
-   self.ab = ptr_new(ab, /no_copy)
-endif
-
-;;; compute hologram
-self->compute
-
+  ;;; compute hologram
+  self.Compute
 end
 
 ;;;;
@@ -635,7 +423,6 @@ end
 ; Retrieve the value of properties associated with the hologram
 ;
 pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
-                                 field = field, $
                                  dim = dim, $
                                  ab = ab, $
                                  resolution = resolution, $
@@ -653,132 +440,71 @@ pro DGGdhmLMSphere::GetProperty, hologram = hologram, $
                                  lambda = lambda, $
                                  mpp = mpp, $
                                  deinterlace = deinterlace, $
-                                 type = type, $
-                                 geometry = geometry, $
-                                 gpu = gpu
+                                 geometry = geometry
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-if arg_present(hologram) then $
-   hologram = *(self.hologram)
+  if arg_present(hologram) then $
+     hologram = *(self.hologram)
 
-if arg_present(field) then begin
-   if self.gpu then begin
-      field = dcomplexarr(3, self.dim[0], self.dim[1], /nozero)
-      field[0,*,*] = gpugetarr((*self.v).Es1, LHS = field[0,*,*])
-      field[1,*,*] = gpugetarr((*self.v).Es2, LHS = field[1,*,*])
-      field[2,*,*] = gpugetarr((*self.v).Es3, LHS = field[2,*,*])
-   endif else $
-      field = *((*self.v).Es)
-endif
+  if arg_present(ab) then ab = *(self.ab)
+  if arg_present(resolution) then resolution = self.resolution
 
-if arg_present(ab) then ab = *(self.ab)
-if arg_present(resolution) then resolution = self.resolution
-
-if arg_present(dim) then dim = self.dim
-if arg_present(rp) then rp = self.rp
-if arg_present(xp) then xp = self.rp[0]
-if arg_present(yp) then yp = self.rp[1]
-if arg_present(zp) then zp = self.rp[2]
-if arg_present(ap) then ap = self.ap
-if arg_present(np) then np = self.np
-if arg_present(kp) then kp = imaginary(self.np)
-if arg_present(nm) then nm = self.nm
-if arg_present(km) then km = imaginary(self.nm)
-if arg_present(alpha) then alpha = self.alpha
-if arg_present(delta) then delta = self.delta
-if arg_present(lambda) then lambda = self.lambda
-if arg_present(mpp) then mpp = self.mpp
-if arg_present(deinterlace) then deinterlace = self.deinterlace
-if arg_present(geometry) then geometry = self.geometry
-if arg_present(type) then type = self.type
-if arg_present(gpu) then gpu = self.gpu
-
+  if arg_present(dim) then dim = self.dim
+  if arg_present(rp) then rp = self.rp
+  if arg_present(xp) then xp = self.rp[0]
+  if arg_present(yp) then yp = self.rp[1]
+  if arg_present(zp) then zp = self.rp[2]
+  if arg_present(ap) then ap = *self.ap
+  if arg_present(np) then np = *self.np
+  if arg_present(kp) then kp = imaginary(self.np)
+  if arg_present(nm) then nm = self.nm
+  if arg_present(km) then km = imaginary(self.nm)
+  if arg_present(alpha) then alpha = self.alpha
+  if arg_present(delta) then delta = self.delta
+  if arg_present(lambda) then lambda = self.lambda
+  if arg_present(mpp) then mpp = self.mpp
+  if arg_present(deinterlace) then deinterlace = self.deinterlace
+  if arg_present(geometry) then geometry = self.geometry
 end
 
 ;;;;
 ;
-; DGGdhmLMSphere:CPUInit
+; DGGdhmLMSphere::CreateGeometry
 ;
-; Allocate CPU memory
-;
-pro DGGdhmLMSphere::CPUInit
+pro DGGdhmLMSphere::CreateGeometry
 
-COMPILE_OPT IDL2,  HIDDEN
+  COMPILE_OPT IDL2,  HIDDEN
 
-npts = self.nx * self.ny
-geometry = {x: dblarr(npts), $
-            y: dblarr(npts), $
-            rho: dblarr(npts), $
-            kr: dblarr(npts), $
-            costheta: dblarr(npts), $
-            sintheta: dblarr(npts), $
-            cosphi: dblarr(npts), $
-            sinphi: dblarr(npts), $
-            coskr: dblarr(npts), $
-            sinkr: dblarr(npts) $
-    }
-
-self.geometry = ptr_new(geometry, /no_copy) ; work with locally defined geometry
-end
-
-;;;;
-;
-; DGGdhmLMSphere::GPUInit
-;
-; Initialize GPU and allocate GPU memory
-;
-function DGGdhmLMSphere::GPUInit
-
-COMPILE_OPT IDL2, HIDDEN
-
-catch, error
-if (error ne 0L) then begin
-   catch, /cancel
-   return, 0B
-endif
-
-;;; Initialize GPU
-gpuinit, /hardware, /quiet
-
-if ~gpudoublecapable() then $
-   return, 0B
-
-self.type = 9
-ftype = 4
-
-;;; Allocate GPU memory
-nx = self.nx
-ny = self.ny
-
-v = {x:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     y:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     z:        gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     rho:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     kr:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     sintheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     costheta: gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     sinphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     cosphi:   gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     xi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-               gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-               gpumake_array(nx, ny, type = self.type, /NOZERO)], $
-     pi:      [gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-               gpumake_array(nx, ny, type = self.type, /NOZERO)], $
-     Mo1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Mo1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Ne1n1:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Ne1n2:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Ne1n3:    gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Es1:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Es2:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     Es3:      gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     dn:       gpumake_array(nx, ny, type = self.type, /NOZERO),  $
-     hologram: gpumake_array(nx, ny, type = ftype, /NOZERO) $
-    }
-self.geometry = ptr_new(v, /no_copy) ; work with locally defined geometry
-
-return, 1B
+  nx = self.nx
+  ny = self.ny
+  npts = nx * ny
+  stride = (self.deinterlace ne 0) ? 2.d : 1.d
+  
+  x = rebin(dindgen(nx), nx, ny, /sample)
+  x = reform(x, npts, /overwrite) - self.r0[0]
+  y = rebin(stride*dindgen(1, ny) + (self.deinterlace mod 2), nx, ny, /sample)
+  y = reform(y, npts, /overwrite) - self.r0[1]
+  
+  coordinates = {x: x, $
+                 y: y  $
+                }
+  
+  geometry = {x: dblarr(npts),        $
+              y: dblarr(npts),        $
+              rho: dblarr(npts),      $
+              kr: dblarr(npts),       $
+              costheta: dblarr(npts), $
+              sintheta: dblarr(npts), $
+              cosphi: dblarr(npts),   $
+              sinphi: dblarr(npts),   $
+              coskr: dblarr(npts),    $
+              sinkr: dblarr(npts),    $
+              npts: npts              $
+             }
+  
+  self.coordinates = ptr_new(coordinates, /no_copy)
+  self.geometry = ptr_new(geometry, /no_copy) ; work with locally defined geometry
 end
 
 ;;;;
@@ -790,116 +516,97 @@ end
 function DGGdhmLMSphere::Init, dim    = dim,    $ ; dimensions of hologram (R)
                                lambda = lambda, $ ; wavelength [um]        (R)
                                mpp    = mpp,    $ ; mag [um/pixel]         (R)
+                               r0     = r0,     $ ; coordinates of lower-left pixel
                                xp = xp,         $ ; sphere position [pixel]
                                yp = yp,         $
                                zp = zp,         $
                                rp = rp,         $ ; 3D position [pixel]
-                               ap = ap,         $ ; sphere radius [um]
-                               np = np,         $ ; sphere refractive index
+                               ap = ap_,        $ ; sphere radius [um]
+                               np = np_,        $ ; sphere refractive index
                                nm = nm,         $ ; medium refractive index
                                resolution = resolution, $ ; resolution for Lorenz-Mie coefficients
                                alpha = alpha,   $ ; relative illumination amplitude
                                delta = delta,   $ ; illumination wavefront distortion
-                               deinterlace = deinterlace, $
-                               noz = noz, $       ; eliminate z-component of field
-                               gpu = gpu          ; use GPU, if available
+                               deinterlace = deinterlace
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-;;; Required inputs
+  ;;; Required inputs
+  if n_elements(dim) ne 2 then begin
+     message, 'dimensions must be specified with the DIM keyword', /inf
+     return, 0B
+  endif
+  self.dim = long(dim)
 
-if (n_elements(dim) eq 2) then $
-   self.dim = long(dim) $
-else begin
-   message, 'dimensions must be specified with the DIM keyword', /inf
-   return, 0B
-endelse
+  if ~isa(lambda, /scalar, /number) then begin
+     message, 'wavelength must be specified with the LAMBDA keyword', /inf
+     return, 0B
+  endif
+  self.lambda = double(lambda)
 
-if isa(lambda, /scalar, /number) then $
-   self.lambda = double(lambda) $
-else begin
-   message, 'wavelength must be specified with the LAMBDA keyword', /inf
-   return, 0B
-endelse
+  if ~isa(mpp, /scalar, /number) then begin
+     message, 'magnification must be specified with the MPP keyword', /inf
+     return, 0B
+  endif
+  self.mpp = double(mpp)
 
-if isa(mpp, /scalar, /number) then $
-   self.mpp = double(mpp) $
-else begin
-   message, 'magnification must be specified with the MPP keyword', /inf
-   return, 0B
-endelse
+  self.nx = self.dim[0]
+  self.ny = self.dim[1]
+  if isa(deinterlace, /scalar, /number) then begin
+     if (deinterlace gt 0) then begin
+        self.deinterlace = 2 - (deinterlace mod 2) ; 1: odd, 2: even
+        self.ny = floor(self.ny/2.) + (self.ny mod 2) * (self.deinterlace - 1)
+     endif
+  endif
 
-self.type = 9                   ; default to double-precision
+  self.r0 = isa(r0, /number, /array) ? double(r0) : [0.d, 0]
 
-self.nx = self.dim[0]
-self.ny = self.dim[1]
-if isa(deinterlace, /scalar, /number) then begin
-   if (deinterlace gt 0) then begin
-      self.deinterlace = 2 - (deinterlace mod 2) ; 1: odd, 2: even
-      self.ny = floor(self.ny/2.) + (self.ny mod 2) * (self.deinterlace - 1)
-   endif
-endif
+  self.CreateGeometry
+  
+  ;;; Optional inputs
+  self.rp = (n_elements(rp) eq 3) ? double(rp) : [dim/2, 100.]
 
-self.noz = keyword_set(noz)
+  if isa(xp, /scalar, /number) then $
+     self.rp[0] = double(xp)
 
-;;; Initialize GPU
-self.gpu = (keyword_set(gpu)) ? self->GPUInit() : 0
-if ~self.gpu then self->CPUInit
-self.v = self.geometry          ; by default, use locally defined geometry
-                                ; to compute field
+  if isa(yp, /scalar, /number) then $
+     self.rp[1] = double(yp)
 
-;;; Optional inputs
-if (n_elements(rp) eq 3) then $
-   self.rp = double(rp)
+  if isa(zp, /scalar, /number) then $
+     self.rp[2] = double(zp)
 
-if isa(xp, /scalar, /number) then $
-   self.rp[0] = double(xp)
+  ap = isa(ap_, /number) ? double(ap_) : 1.d
+  self.ap = ptr_new(ap, /no_copy)
 
-if isa(yp, /scalar, /number) then $
-   self.rp[1] = double(yp)
+  np = isa(np_, /number) ? dcomplex(np_) : dcomplex(1.4)
+  if n_elements(np) ne n_elements(*self.ap) then begin
+     message, 'ap and np should have same number of elements', /inf
+     return, 0B
+  endif
+  self.np = ptr_new(np, /no_copy)
 
-if isa(zp, /scalar, /number) then $
-   self.rp[2] = double(zp)
+  self.nm = isa(nm, /scalar, /number) ? dcomplex(nm) : dcomplex(1.3)
 
-if isa(ap, /scalar, /number) then $
-   self.ap = double(ap) $
-else $
-   self.ap = 1.d
+  self.alpha = isa(alpha, /scalar, /number) ? double(alpha) : 1.d
 
-if isa(np, /scalar, /number) then $
-   self.np = dcomplex(np) $
-else $
-   self.np = dcomplex(1.4)
+  self.delta = isa(delta, /scalar, /number) ? double(delta) : 0.d
 
-if isa(nm, /scalar, /number) then $
-   self.nm = dcomplex(nm) $
-else $
-   self.nm = dcomplex(1.3)
+  self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
 
-if isa(alpha, /scalar, /number) then $
-   self.alpha = double(alpha) $
-else $
-   self.alpha = 1.d
+  self.resolution = isa(resolution, /scalar, /number) ? double(resolution) : 0
 
-if isa(delta, /scalar, /number) then $
-   self.delta = double(delta) $
-else $
-   self.delta = 0.d
+  ab = sphere_coefficients(*self.ap, *self.np, self.nm, self.lambda, $
+                           resolution = self.resolution)
+  self.ab = ptr_new(ab)
 
-self.k = 2.d * !dpi * real_part(self.nm) * self.mpp / self.lambda
+  ;;; allocate storage for the result
+  a = dblarr(self.nx, self.ny, /nozero)
+  self.hologram = ptr_new(a, /no_copy)
 
-self.resolution = isa(resolution, /scalar, /number) ? double(resolution) : 0
+  self.UpdateGeometry
+  self.Compute
 
-ab = sphere_coefficients(self.ap, self.np, self.nm, self.lambda, resolution = self.resolution)
-self.ab = ptr_new(ab)
-
-;;; allocate storage for the result
-a = dblarr(self.nx, self.ny, /nozero)
-self.hologram = ptr_new(a, /no_copy)
-
-self->compute
-
-return, 1B
+  return, 1B
 end
 
 ;;;;
@@ -910,27 +617,22 @@ end
 ;
 pro DGGdhmLMSphere::Cleanup
 
-COMPILE_OPT IDL2, HIDDEN
+  COMPILE_OPT IDL2, HIDDEN
 
-if ptr_valid(self.hologram) then $
-   ptr_free, self.hologram
+  if ptr_valid(self.hologram) then $
+     ptr_free, self.hologram
 
-if ptr_valid(self.geometry) then begin
-   if self.gpu then begin
-      v = *(self.geometry)
-      gpufree, [v.x, v.y, v.z]
-      gpufree, [v.rho, v.kr]
-      gpufree, [v.sintheta, v.costheta, v.sinphi, v.cosphi]
-      gpufree, v.xi
-      gpufree, v.pi
-      gpufree, [v.Mo1n2, v.Mo1n3, v.Ne1n1, v.Ne1n2, v.Ne1n3]
-      gpufree, [v.Es1, v.Es2, v.Es3]
-      gpufree, v.dn
-      gpufree, v.hologram
-   endif
-   ptr_free, self.geometry
-endif
+  if ptr_valid(self.coordinates) then $
+     ptr_free, self.coordinates
+  
+  if ptr_valid(self.geometry) then $
+     ptr_free, self.geometry
 
+  if ptr_valid(self.ap) then $
+     ptr_free, self.ap
+
+  if ptr_valid(self.np) then $
+     ptr_free, self.np
 end
 
 ;;;;
@@ -941,31 +643,28 @@ end
 ;
 pro DGGdhmLMSphere__define
 
-COMPILE_OPT IDL2
+  COMPILE_OPT IDL2, HIDDEN
 
-struct = {DGGdhmLMSphere,            $
-          INHERITS     IDL_OBJECT,   $
-          hologram:    ptr_new(),    $ ; computed hologram
-          dim:         [0L, 0L],     $ ; dimensions of hologram
-          ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
-          resolution:  0.D,          $ ; resolution to 
-          v:           ptr_new(),    $ ; pointer to structure of preallocated variables
-          geometry:    ptr_new(),    $ ; local copy of preallocated variables
-          type:        0,            $ ; data type (double if possible)
-          rp:          dblarr(3),    $ ; 3D position [pixel]
-          ap:          0.D,          $ ; sphere radius [um]
-          np:          dcomplex(0.), $ ; sphere refractive index
-          nm:          dcomplex(0.), $ ; medium refractive index
-          alpha:       0.D,          $ ; relative illumination amplitude
-          delta:       0.D,          $ ; illumination wavefront distortion
-          mpp:         0.D,          $ ; magnification [um/pixel]
-          lambda:      0.D,          $ ; vacuum wavelength [um]
-          k:           0.D,          $ ; wavenumber in medium [pixel^-1]
-          deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
-          noz:         0,            $ ; flag: if set, ignore z-component of field
-          nx:          0L,           $ ; width of deinterlaced hologram
-          ny:          0L,           $ ; height of deinterlaced hologram
-          gpu:         0             $ ; flag: 1 if GPU enabled
+  struct = {DGGdhmLMSphere,            $
+            INHERITS     IDL_OBJECT,   $
+            hologram:    ptr_new(),    $ ; computed hologram
+            dim:         [0L, 0L],     $ ; dimensions of hologram
+            r0:          [0.d, 0],     $ ; coordinates of lower-left corner
+            ab:          ptr_new(),    $ ; Lorenz-Mie coefficients
+            resolution:  0.D,          $ ; resolution to
+            coordinates: ptr_new(),    $ ; Cartesian coordinates of pixels
+            geometry:    ptr_new(),    $ ; local copy of preallocated variables
+            rp:          dblarr(3),    $ ; 3D position [pixel]
+            ap:          ptr_new(),    $ ; sphere radius [um]
+            np:          ptr_new(), $ ; sphere refractive index
+            nm:          dcomplex(0.), $ ; medium refractive index
+            alpha:       0.D,          $ ; relative illumination amplitude
+            delta:       0.D,          $ ; illumination wavefront distortion
+            mpp:         0.D,          $ ; magnification [um/pixel]
+            lambda:      0.D,          $ ; vacuum wavelength [um]
+            k:           0.D,          $ ; wavenumber in medium [pixel^-1]
+            deinterlace: 0,            $ ; 0: none, 1: odd, 2: even
+            nx:          0L,           $ ; width of deinterlaced hologram
+            ny:          0L            $ ; height of deinterlaced hologram
          }
-
 end
